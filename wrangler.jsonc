@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-tifen-yechun-survey",
+  "account_id": "eb2b60a17c13e545fc5e2bd6e15a0efd",
+  "main": "server/index.ts",
+  "compatibility_date": "2026-06-10",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ai-tifen-yechun-survey",
+      "database_id": "6fbcd36d-7fc9-472c-98a3-8f41565256fb"
+    }
+  ],
+  "vars": {
+    "OWNER_LABEL": "AI 提分叶路春"
+  }
+}
