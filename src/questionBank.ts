@@ -8,6 +8,8 @@ export const SURVEY_CATALOG: SurveyCatalog = {
   ],
   "profile": {
     "gradeOptions": [
+      "5年级",
+      "6年级",
       "初一",
       "初二",
       "初三",
