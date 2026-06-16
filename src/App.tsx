@@ -744,7 +744,7 @@ function PublicApp() {
                                   },
                                 }))
                               }
-                              placeholder="如 112 / A / 班级前10%"
+                              placeholder="如99/满分"
                             />
                           </label>
                         ))}
