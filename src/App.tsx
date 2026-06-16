@@ -975,6 +975,96 @@ function AdminApp() {
     }
   };
 
+  const handleExportSelectedCsvs = () => {
+    if (!selected) {
+      return;
+    }
+    try {
+      const zip = new SimpleZip();
+
+      // 1. 基础档案
+      const profileHeaders = [
+        "学生姓名",
+        "学校全称",
+        "年级",
+        "性别",
+        "家长姓名",
+        "家长身份",
+        "语文",
+        "数学",
+        "英语",
+        "物理",
+        "化学",
+        "生物",
+        "政治",
+        "历史",
+        "地理",
+        "成绩备注",
+      ];
+      const profileValues = [
+        selected.profile.studentName,
+        selected.profile.schoolName,
+        selected.profile.grade,
+        selected.profile.gender,
+        selected.profile.guardianName,
+        selected.profile.guardianRole,
+        selected.profile.subjectScores.chinese,
+        selected.profile.subjectScores.math,
+        selected.profile.subjectScores.english,
+        selected.profile.subjectScores.physics,
+        selected.profile.subjectScores.chemistry,
+        selected.profile.subjectScores.biology,
+        selected.profile.subjectScores.politics,
+        selected.profile.subjectScores.history,
+        selected.profile.subjectScores.geography,
+        selected.profile.scoreNotes,
+      ];
+      const profileCsv = [
+        profileHeaders.map(csvEscape).join(","),
+        profileValues.map(csvEscape).join(","),
+      ].join("\n");
+      zip.addFile("1-基础档案.csv", toUtf8BOM(profileCsv));
+
+      // 2. 问卷测评
+      const surveysToExport = [
+        { key: "studentMbti" as const, filename: "2-学习性格.csv" },
+        { key: "vark" as const, filename: "3-学习风格.csv" },
+        { key: "learningMotivation" as const, filename: "4-学习动力.csv" },
+        { key: "cognition" as const, filename: "5-学习认知.csv" },
+      ];
+
+      for (const item of surveysToExport) {
+        const survey = SURVEY_CATALOG.surveys.find((s) => s.key === item.key);
+        if (!survey) {
+          continue;
+        }
+
+        const section = selected.sections[item.key];
+        const rows = [["题号", "题目内容", "回答内容"].map(csvEscape).join(",")];
+
+        survey.questions.forEach((question, index) => {
+          const answerId = section?.answers[question.id] ?? "";
+          const option = question.options.find((opt) => opt.id === answerId);
+          const answerLabel = option?.label ?? "";
+          rows.push([index + 1, question.prompt, answerLabel].map(csvEscape).join(","));
+        });
+
+        zip.addFile(item.filename, toUtf8BOM(rows.join("\n")));
+      }
+
+      const blob = zip.generate();
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      const studentName = selected.profile.studentName || selected.accessCode;
+      anchor.download = `${studentName}-5张测评量表.zip`;
+      anchor.click();
+      URL.revokeObjectURL(href);
+    } catch {
+      setError("导出 CSV 压缩包失败");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!token) {
       return;
@@ -1115,6 +1205,14 @@ function AdminApp() {
                         disabled={loading}
                       >
                         导出本条 JSON
+                      </button>
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={handleExportSelectedCsvs}
+                        disabled={loading}
+                      >
+                        下载 5 张 CSV 表格
                       </button>
                       <button
                         type="button"
@@ -1304,6 +1402,143 @@ function subjectLabel(key: string) {
     geography: "地理",
   };
   return map[key] ?? key;
+}
+
+class SimpleZip {
+  private files: { name: string; content: Uint8Array }[] = [];
+
+  addFile(name: string, content: Uint8Array) {
+    this.files.push({ name, content });
+  }
+
+  private makeCrcTable(): number[] {
+    const table: number[] = [];
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) {
+        if (c & 1) {
+          c = 0xedb88320 ^ (c >>> 1);
+        } else {
+          c = c >>> 1;
+        }
+      }
+      table[n] = c;
+    }
+    return table;
+  }
+
+  private calculateCrc(data: Uint8Array): number {
+    const table = this.makeCrcTable();
+    let crc = 0xffffffff;
+    for (let i = 0; i < data.length; i++) {
+      crc = table[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  generate(): Blob {
+    const buffers: any[] = [];
+    const localHeaders: { offset: number; size: number; crc: number; name: string }[] = [];
+    let currentOffset = 0;
+
+    const writeNum = (val: number, len: number): Uint8Array => {
+      const buf = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        buf[i] = (val >>> (i * 8)) & 0xff;
+      }
+      return buf;
+    };
+
+    for (const file of this.files) {
+      const nameBytes = new TextEncoder().encode(file.name);
+      const crc = this.calculateCrc(file.content);
+      const size = file.content.length;
+
+      const header = new Uint8Array(30);
+      header.set([0x50, 0x4b, 0x03, 0x04]);
+      header.set(writeNum(10, 2), 4);
+      header.set(writeNum(0, 2), 6);
+      header.set(writeNum(0, 2), 8);
+      header.set(writeNum(0, 2), 10);
+      header.set(writeNum(0, 2), 12);
+      header.set(writeNum(crc, 4), 14);
+      header.set(writeNum(size, 4), 18);
+      header.set(writeNum(size, 4), 22);
+      header.set(writeNum(nameBytes.length, 2), 26);
+      header.set(writeNum(0, 2), 28);
+
+      buffers.push(header);
+      buffers.push(nameBytes);
+      buffers.push(file.content);
+
+      localHeaders.push({ offset: currentOffset, size, crc, name: file.name });
+      currentOffset += header.length + nameBytes.length + size;
+    }
+
+    const centralDirectoryStart = currentOffset;
+    let centralDirectorySize = 0;
+
+    for (let i = 0; i < this.files.length; i++) {
+      const file = this.files[i];
+      const lh = localHeaders[i];
+      const nameBytes = new TextEncoder().encode(file.name);
+
+      const cdHeader = new Uint8Array(46);
+      cdHeader.set([0x50, 0x4b, 0x01, 0x02]);
+      cdHeader.set(writeNum(10, 2), 4);
+      cdHeader.set(writeNum(10, 2), 6);
+      cdHeader.set(writeNum(0, 2), 8);
+      cdHeader.set(writeNum(0, 2), 10);
+      cdHeader.set(writeNum(0, 2), 12);
+      cdHeader.set(writeNum(0, 2), 14);
+      cdHeader.set(writeNum(lh.crc, 4), 16);
+      cdHeader.set(writeNum(lh.size, 4), 20);
+      cdHeader.set(writeNum(lh.size, 4), 24);
+      cdHeader.set(writeNum(nameBytes.length, 2), 28);
+      cdHeader.set(writeNum(0, 2), 30);
+      cdHeader.set(writeNum(0, 2), 32);
+      cdHeader.set(writeNum(0, 2), 34);
+      cdHeader.set(writeNum(0, 2), 36);
+      cdHeader.set(writeNum(0, 4), 38);
+      cdHeader.set(writeNum(lh.offset, 4), 42);
+
+      buffers.push(cdHeader);
+      buffers.push(nameBytes);
+      centralDirectorySize += cdHeader.length + nameBytes.length;
+    }
+
+    const eocd = new Uint8Array(22);
+    eocd.set([0x50, 0x4b, 0x05, 0x06]);
+    eocd.set(writeNum(0, 2), 4);
+    eocd.set(writeNum(0, 2), 6);
+    eocd.set(writeNum(this.files.length, 2), 8);
+    eocd.set(writeNum(this.files.length, 2), 10);
+    eocd.set(writeNum(centralDirectorySize, 4), 12);
+    eocd.set(writeNum(centralDirectoryStart, 4), 16);
+    eocd.set(writeNum(0, 2), 20);
+
+    buffers.push(eocd);
+
+    return new Blob(buffers, { type: "application/zip" });
+  }
+}
+
+function toUtf8BOM(text: string): Uint8Array {
+  const encoder = new TextEncoder();
+  const arr = encoder.encode(text);
+  const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
+  const result = new Uint8Array(bom.length + arr.length);
+  result.set(bom, 0);
+  result.set(arr, bom.length);
+  return result;
+}
+
+function csvEscape(value: unknown): string {
+  const str = String(value ?? "");
+  if (str.includes(",") || str.includes("\n") || str.includes("\r") || str.includes('"')) {
+    return `"${str.replaceAll('"', '""')}"`;
+  }
+  return str;
 }
 
 export default App;
