@@ -51,7 +51,7 @@ const studentSurveyKeys: SurveyKey[] = [
   "vark",
   "cognition",
 ];
-const studentSurveyLabels = ["学生 MBTI", "学习动力", "VARK", "学习认知"];
+const studentSurveyLabels = ["MBTI 测评", "学习动力", "VARK", "学习认知"];
 
 const devMode = import.meta.env.DEV;
 type PublicRole = "student" | "guardian";
@@ -63,20 +63,22 @@ function App() {
 
 function PublicApp() {
   const surveys = SURVEY_CATALOG.surveys;
+  const isGuardianUrl = window.location.pathname === "/guardian" || window.location.search.includes("role=guardian");
+
   const [record, setRecord] = useState<PublicRecord | null>(null);
-  const [roleMode, setRoleMode] = useState<PublicRole | null>(null);
+  const [roleMode, setRoleMode] = useState<PublicRole | null>(isGuardianUrl ? "guardian" : null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [profileDraft, setProfileDraft] = useState<StudentProfile>(blankProfile());
   const [profileCollapsed, setProfileCollapsed] = useState(false);
-  const [activeSurveyKey, setActiveSurveyKey] = useState<SurveyKey | null>(null);
+  const [activeSurveyKey, setActiveSurveyKey] = useState<SurveyKey | null>(isGuardianUrl ? "guardianMbti" : null);
   const [surveyDraft, setSurveyDraft] = useState<AnswerMap>({});
   const [questionIndex, setQuestionIndex] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [showGuardianReport, setShowGuardianReport] = useState(false);
   const debounceTimer = useRef<number | null>(null);
   const transitionTimer = useRef<number | null>(null);
-  const draftHydrated = useRef(false);
+  const draftHydrated = useRef(isGuardianUrl);
 
   const activeSurvey = useMemo(
     () => surveys.find((survey) => survey.key === activeSurveyKey) ?? null,
@@ -215,6 +217,9 @@ function PublicApp() {
       setActiveSurveyKey(null);
       setSurveyDraft({});
       setQuestionIndex(0);
+      if (window.location.pathname === "/guardian" || window.location.search.includes("role=guardian")) {
+        window.history.pushState(null, "", "/");
+      }
       return;
     }
     setActiveSurveyKey(null);
@@ -363,18 +368,18 @@ function PublicApp() {
         <div>
           <p className="eyebrow">MCA学习力测评</p>
           <h1>测评，是你认识自己的开始！</h1>
-          <p className="hero-copy">按提示完成孩子测评，我们会第一时间给你出测评报告。</p>
+          <p className="hero-copy">请按提示完成测评，完成后我们会第一时间为您出具测评报告。</p>
         </div>
         {hasStarted ? (
           <div className="access-card">
             <span>当前测评</span>
-            <strong>{roleMode === "guardian" ? "家长测评" : "孩子测评"}</strong>
+            <strong>{roleMode === "guardian" ? "家长测评" : "学习力测评"}</strong>
             <small>{roleMode === "guardian" ? "提交后查看结果。" : "填完一项提交，再继续下一项。"}</small>
           </div>
         ) : (
           <div className="access-card subtle">
             <span>测评入口</span>
-            <strong>孩子测评</strong>
+            <strong>学习力测评</strong>
             <small>基础档案 + 4 项测评</small>
           </div>
         )}
@@ -386,7 +391,7 @@ function PublicApp() {
       {!hasStarted ? (
         <section className="board board-home">
           <article className="action-card home-primary-card">
-            <p className="eyebrow">孩子测评</p>
+            <p className="eyebrow">学习力测评</p>
             <h2>MCA学习力测评</h2>
             <p>先填写基础档案，再完成 4 项测评。</p>
             <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
@@ -502,7 +507,7 @@ function PublicApp() {
                   <p className="eyebrow">档案信息</p>
                   <div className="section-heading">
                       <div>
-                        <h2>孩子基础档案</h2>
+                        <h2>基础档案</h2>
                         <p>填写姓名、学校、年级和学科成绩。其余信息可以按实际情况选填。</p>
                       </div>
                     <div className="button-row">
@@ -676,7 +681,7 @@ function PublicApp() {
                 <section className="stack-card">
                   <div className="section-heading">
                     <div>
-                      <p className="eyebrow">孩子测评</p>
+                      <p className="eyebrow">学习力测评</p>
                       <h2>4 项测评</h2>
                     </div>
                   </div>

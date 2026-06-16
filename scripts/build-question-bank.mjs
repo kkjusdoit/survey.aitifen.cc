@@ -102,13 +102,16 @@ const data = {
       { key: "physics", label: "物理" },
       { key: "chemistry", label: "化学" },
       { key: "biology", label: "生物" },
+      { key: "politics", label: "政治" },
+      { key: "history", label: "历史" },
+      { key: "geography", label: "地理" },
     ],
   },
   surveys: [
     {
       key: "studentMbti",
-      title: "MBTI 测评（学生版）",
-      shortTitle: "学生 MBTI",
+      title: "MBTI 测评",
+      shortTitle: "MBTI 测评",
       audience: "student",
       intro:
         "帮助了解学生在社交、学习和决策中的偏好，为个性化沟通与培养提供线索。",

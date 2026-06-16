@@ -67,8 +67,8 @@ export const SURVEY_CATALOG: SurveyCatalog = {
   "surveys": [
     {
       "key": "studentMbti",
-      "title": "MBTI 测评（学生版）",
-      "shortTitle": "学生 MBTI",
+      "title": "MBTI 测评",
+      "shortTitle": "MBTI 测评",
       "audience": "student",
       "intro": "帮助了解学生在社交、学习和决策中的偏好，为个性化沟通与培养提供线索。",
       "sourceTitle": "MBTI 学生版测评问卷——探索你的行为偏好 - 腾讯问卷",
