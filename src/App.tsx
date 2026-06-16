@@ -981,6 +981,7 @@ function AdminApp() {
     }
     try {
       const zip = new SimpleZip();
+      const studentName = selected.profile.studentName || selected.accessCode;
 
       // 1. 基础档案
       const profileHeaders = [
@@ -1023,14 +1024,14 @@ function AdminApp() {
         profileHeaders.map(csvEscape).join(","),
         profileValues.map(csvEscape).join(","),
       ].join("\n");
-      zip.addFile("1-基础档案.csv", toUtf8BOM(profileCsv));
+      zip.addFile(`${studentName}基础档案.csv`, toUtf8BOM(profileCsv));
 
       // 2. 问卷测评
       const surveysToExport = [
-        { key: "studentMbti" as const, filename: "2-学习性格.csv" },
-        { key: "vark" as const, filename: "3-学习风格.csv" },
-        { key: "learningMotivation" as const, filename: "4-学习动力.csv" },
-        { key: "cognition" as const, filename: "5-学习认知.csv" },
+        { key: "studentMbti" as const, filename: `${studentName}学习性格.csv` },
+        { key: "vark" as const, filename: `${studentName}学习风格.csv` },
+        { key: "learningMotivation" as const, filename: `${studentName}学习动力.csv` },
+        { key: "cognition" as const, filename: `${studentName}学习认知.csv` },
       ];
 
       for (const item of surveysToExport) {
@@ -1056,7 +1057,6 @@ function AdminApp() {
       const href = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = href;
-      const studentName = selected.profile.studentName || selected.accessCode;
       anchor.download = `${studentName}-5张测评量表.zip`;
       anchor.click();
       URL.revokeObjectURL(href);
@@ -1242,7 +1242,7 @@ function AdminApp() {
                       <li>{completionSummary(selected.completion)}</li>
                     </div>
                     <div className="survey-admin-tabs">
-                      {SURVEY_CATALOG.surveys.map((survey) => {
+                      {SURVEY_CATALOG.surveys.filter((survey) => survey.key !== "guardianMbti").map((survey) => {
                         const section = selected.sections[survey.key];
                         const answeredCount = countAnswered(survey, section.answers);
                         return (
@@ -1339,9 +1339,11 @@ function firstIncompleteIndex(survey: SurveyDefinition, answers: AnswerMap) {
 
 function firstAnsweredSurveyKey(record: AdminDetail) {
   return (
-    SURVEY_CATALOG.surveys.find((survey) =>
-      countAnswered(survey, record.sections[survey.key].answers) > 0,
-    )?.key ?? SURVEY_CATALOG.surveys[0]?.key ?? null
+    SURVEY_CATALOG.surveys
+      .filter((survey) => survey.key !== "guardianMbti")
+      .find((survey) =>
+        countAnswered(survey, record.sections[survey.key].answers) > 0,
+      )?.key ?? SURVEY_CATALOG.surveys[0]?.key ?? null
   );
 }
 
