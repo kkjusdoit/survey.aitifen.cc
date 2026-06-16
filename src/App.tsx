@@ -112,6 +112,18 @@ function PublicApp() {
   }, [activeSurvey, record, surveyDraft]);
 
   const handleStart = async (role: PublicRole) => {
+    if (role === "guardian") {
+      setRoleMode("guardian");
+      setRecord(null);
+      setSurveyDraft({});
+      setQuestionIndex(0);
+      setShowGuardianReport(false);
+      setError("");
+      draftHydrated.current = true;
+      setActiveSurveyKey("guardianMbti");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -121,12 +133,6 @@ function PublicApp() {
       setProfileDraft(response.record.profile);
       setProfileCollapsed(false);
       setShowGuardianReport(false);
-      if (role === "guardian") {
-        draftHydrated.current = false;
-        setSurveyDraft(response.record.sections.guardianMbti.answers);
-        setQuestionIndex(0);
-        setActiveSurveyKey("guardianMbti");
-      }
     } catch (requestError) {
       setError(getMessage(requestError, "进入测评失败，请刷新后重试"));
     } finally {
@@ -183,8 +189,19 @@ function PublicApp() {
     setActiveSurveyKey(surveyKey);
   };
 
+  const handleSurveyBack = () => {
+    if (roleMode === "guardian" && !record) {
+      setRoleMode(null);
+      setActiveSurveyKey(null);
+      setSurveyDraft({});
+      setQuestionIndex(0);
+      return;
+    }
+    setActiveSurveyKey(null);
+  };
+
   const handleCompleteSurvey = async () => {
-    if (!record || !activeSurvey) {
+    if (!activeSurvey) {
       return;
     }
     const allAnswered = activeSurvey.questions.every((question) => Boolean(surveyDraft[question.id]));
@@ -192,6 +209,17 @@ function PublicApp() {
       setError("还有题目未填写，先完成再提交。");
       return;
     }
+
+    if (roleMode === "guardian" && !record && activeSurvey.key === "guardianMbti") {
+      setActiveSurveyKey(null);
+      setShowGuardianReport(true);
+      return;
+    }
+
+    if (!record) {
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -217,12 +245,13 @@ function PublicApp() {
 
   const guardianSurvey = surveys.find((survey) => survey.key === "guardianMbti");
   const guardianResult =
-    record && guardianSurvey
+    guardianSurvey
       ? calculateGuardianMbti(
           guardianSurvey,
-          record.sections.guardianMbti.answers,
+          roleMode === "guardian" && !record ? surveyDraft : record?.sections.guardianMbti.answers ?? {},
         )
       : null;
+  const hasStarted = Boolean(record) || roleMode === "guardian";
 
   const fillProfileSample = () => {
     setProfileDraft({
@@ -313,22 +342,22 @@ function PublicApp() {
       <header className="hero-strip">
         <div>
           <p className="eyebrow">AI 提分叶路春</p>
-          <h1>个性化教育前置信息采集</h1>
+          <h1>个性化学习测评</h1>
           <p className="hero-copy">
-            学生填写基础档案和 4 项测评；家长单独完成 MBTI，并当场看到截图友好的结果页。
+            请选择你的身份，按页面提示完成填写。
           </p>
         </div>
-        {record ? (
+        {hasStarted ? (
           <div className="access-card">
             <span>当前填写</span>
             <strong>{roleMode === "guardian" ? "家长测评" : "学生测评"}</strong>
-            <small>{roleMode === "guardian" ? "完成后直接生成 MBTI 结果页。" : "填写档案后完成 4 项学生测评。"}</small>
+            <small>{roleMode === "guardian" ? "提交后查看结果。" : "请先填写基础档案。"}</small>
           </div>
         ) : (
           <div className="access-card subtle">
             <span>填写方式</span>
-            <strong>选择身份开始</strong>
-            <small>不用注册账号，不需要理解任何内部编号。</small>
+            <strong>选择身份</strong>
+            <small>学生和家长分开填写。</small>
           </div>
         )}
       </header>
@@ -336,36 +365,36 @@ function PublicApp() {
       {error ? <div className="toast error">{error}</div> : null}
       {lastSavedAt ? <div className="toast success">最近保存：{lastSavedAt}</div> : null}
 
-      {!record ? (
+      {!hasStarted ? (
         <section className="board board-home">
           <div className="home-grid">
             <article className="action-card">
               <p className="eyebrow">学生填写</p>
-              <h2>基础档案 + 4 项测评</h2>
-              <p>先填学习档案，再完成学生 MBTI、学习动力、VARK、学习认知。后台可下载原始数据。</p>
+              <h2>学生测评</h2>
+              <p>填写基础档案，并完成 4 项学习测评。</p>
               <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
-                {loading ? "正在进入..." : "我是学生，开始填写"}
+                {loading ? "正在进入..." : "开始填写"}
               </button>
             </article>
             <article className="action-card">
               <p className="eyebrow">家长填写</p>
-              <h2>家长 MBTI 测评</h2>
-              <p>家长单独完成测评，提交后立刻看到 MBTI 结果页，适合截图反馈。</p>
+              <h2>家长测评</h2>
+              <p>完成家长 MBTI 测评，提交后查看结果。</p>
               <button type="button" className="secondary" onClick={() => handleStart("guardian")} disabled={loading}>
-                {loading ? "正在进入..." : "我是家长，开始测评"}
+                {loading ? "正在进入..." : "开始测评"}
               </button>
             </article>
           </div>
         </section>
       ) : null}
 
-      {record ? (
+      {hasStarted ? (
         <section className="board">
           {activeSurvey ? (
             <div className="survey-shell">
               <div className="survey-topbar">
-                <button type="button" className="ghost" onClick={() => setActiveSurveyKey(null)}>
-                  返回总览
+                <button type="button" className="ghost" onClick={handleSurveyBack}>
+                  {roleMode === "guardian" && !record ? "返回首页" : "返回总览"}
                 </button>
                 <div className="survey-meta">
                   <span>{activeSurvey.shortTitle}</span>
@@ -441,7 +470,7 @@ function PublicApp() {
                           onClick={handleCompleteSurvey}
                           disabled={loading || !surveyDraft[activeQuestion.id]}
                         >
-                          完成并保存
+                          {roleMode === "guardian" && !record ? "提交并查看结果" : "完成并保存"}
                         </button>
                       )}
                     </div>
@@ -455,11 +484,11 @@ function PublicApp() {
                 <div className="dashboard-column wide">
                   <GuardianResultReport
                     result={guardianResult}
-                    guardianName={record.profile.guardianName}
+                    guardianName={record?.profile.guardianName}
                     onBack={roleMode === "guardian" ? undefined : () => setShowGuardianReport(false)}
                   />
                 </div>
-              ) : (
+              ) : record ? (
               <div className="dashboard-column wide">
                 <section className="stack-card">
                   <p className="eyebrow">档案信息</p>
@@ -650,8 +679,9 @@ function PublicApp() {
                   </div>
                 </section>
               </div>
-              )}
+              ) : null}
 
+              {record ? (
               <div className="dashboard-column">
                 {roleMode === "guardian" ? (
                   <section className="stack-card">
@@ -700,6 +730,7 @@ function PublicApp() {
                   </ul>
                 </section>
               </div>
+              ) : null}
             </div>
           )}
         </section>
