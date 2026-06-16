@@ -230,6 +230,36 @@ small {
   min-height: 220px;
 }
 
+.home-primary-card {
+  width: min(520px, 100%);
+  min-height: 260px;
+}
+
+.home-primary-card h2 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+}
+
+.step-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 1.4em;
+  color: var(--subtle);
+}
+
+.step-list li::marker {
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.completion-note {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(46, 110, 105, 0.1);
+  color: var(--teal);
+  font-weight: 800;
+}
+
 .stack-card {
   display: grid;
   gap: 18px;

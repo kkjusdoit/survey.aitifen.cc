@@ -51,6 +51,7 @@ const studentSurveyKeys: SurveyKey[] = [
   "vark",
   "cognition",
 ];
+const studentSurveyLabels = ["学生 MBTI", "学习动力", "VARK", "学习认知"];
 
 const devMode = import.meta.env.DEV;
 type PublicRole = "student" | "guardian";
@@ -74,6 +75,7 @@ function PublicApp() {
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [showGuardianReport, setShowGuardianReport] = useState(false);
   const debounceTimer = useRef<number | null>(null);
+  const transitionTimer = useRef<number | null>(null);
   const draftHydrated = useRef(false);
 
   const activeSurvey = useMemo(
@@ -164,7 +166,25 @@ function PublicApp() {
       ...current,
       [questionId]: optionId,
     }));
+
+    if (activeSurvey && questionIndex < activeSurvey.questions.length - 1) {
+      if (transitionTimer.current) {
+        window.clearTimeout(transitionTimer.current);
+      }
+      transitionTimer.current = window.setTimeout(() => {
+        setQuestionIndex((current) => current + 1);
+        transitionTimer.current = null;
+      }, 200);
+    }
   };
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimer.current) {
+        window.clearTimeout(transitionTimer.current);
+      }
+    };
+  }, [activeSurveyKey, questionIndex]);
 
   const handleOpenSurvey = (surveyKey: SurveyKey) => {
     if (!record) {
@@ -341,23 +361,21 @@ function PublicApp() {
       <div className="ambient ambient-b" />
       <header className="hero-strip">
         <div>
-          <p className="eyebrow">AI 提分叶路春</p>
-          <h1>个性化学习测评</h1>
-          <p className="hero-copy">
-            请选择你的身份，按页面提示完成填写。
-          </p>
+          <p className="eyebrow">MCA学习力测评</p>
+          <h1>测评，是你认识自己的开始！</h1>
+          <p className="hero-copy">按提示完成孩子测评，我们会第一时间给你出测评报告。</p>
         </div>
         {hasStarted ? (
           <div className="access-card">
-            <span>当前填写</span>
-            <strong>{roleMode === "guardian" ? "家长测评" : "学生测评"}</strong>
-            <small>{roleMode === "guardian" ? "提交后查看结果。" : "请先填写基础档案。"}</small>
+            <span>当前测评</span>
+            <strong>{roleMode === "guardian" ? "家长测评" : "孩子测评"}</strong>
+            <small>{roleMode === "guardian" ? "提交后查看结果。" : "填完一项提交，再继续下一项。"}</small>
           </div>
         ) : (
           <div className="access-card subtle">
-            <span>填写方式</span>
-            <strong>选择身份</strong>
-            <small>学生和家长分开填写。</small>
+            <span>测评入口</span>
+            <strong>孩子测评</strong>
+            <small>基础档案 + 4 项测评</small>
           </div>
         )}
       </header>
@@ -367,24 +385,14 @@ function PublicApp() {
 
       {!hasStarted ? (
         <section className="board board-home">
-          <div className="home-grid">
-            <article className="action-card">
-              <p className="eyebrow">学生填写</p>
-              <h2>学生测评</h2>
-              <p>填写基础档案，并完成 4 项学习测评。</p>
-              <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
-                {loading ? "正在进入..." : "开始填写"}
-              </button>
-            </article>
-            <article className="action-card">
-              <p className="eyebrow">家长填写</p>
-              <h2>家长测评</h2>
-              <p>完成家长 MBTI 测评，提交后查看结果。</p>
-              <button type="button" className="secondary" onClick={() => handleStart("guardian")} disabled={loading}>
-                {loading ? "正在进入..." : "开始测评"}
-              </button>
-            </article>
-          </div>
+          <article className="action-card home-primary-card">
+            <p className="eyebrow">孩子测评</p>
+            <h2>MCA学习力测评</h2>
+            <p>先填写基础档案，再完成 4 项测评。</p>
+            <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
+              {loading ? "正在进入..." : "开始测评"}
+            </button>
+          </article>
         </section>
       ) : null}
 
@@ -493,10 +501,10 @@ function PublicApp() {
                 <section className="stack-card">
                   <p className="eyebrow">档案信息</p>
                   <div className="section-heading">
-                    <div>
-                      <h2>学生基础档案</h2>
-                      <p>把姓名、学校全称、年级、学科成绩集中在这里，避免 4 个学生问卷重复填写。</p>
-                    </div>
+                      <div>
+                        <h2>孩子基础档案</h2>
+                        <p>填写姓名、学校、年级和学科成绩。其余信息可以按实际情况选填。</p>
+                      </div>
                     <div className="button-row">
                       {record.completion.profile ? (
                         <button
@@ -655,10 +663,21 @@ function PublicApp() {
                 ) : null}
 
                 <section className="stack-card">
+                  <p className="eyebrow">测评步骤指导</p>
+                  <h2>按顺序完成就可以</h2>
+                  <ol className="step-list">
+                    <li>填完一项</li>
+                    <li>提交</li>
+                    <li>继续填下一项</li>
+                    <li>四项测评填完，告诉家长：“测评完，我们会第一时间给你出测评报告！”</li>
+                  </ol>
+                </section>
+
+                <section className="stack-card">
                   <div className="section-heading">
                     <div>
-                      <p className="eyebrow">学生任务</p>
-                      <h2>学生 4 项测评</h2>
+                      <p className="eyebrow">孩子测评</p>
+                      <h2>4 项测评</h2>
                     </div>
                   </div>
                   <div className="survey-card-grid">
@@ -716,18 +735,19 @@ function PublicApp() {
                 ) : null}
 
                 <section className="stack-card">
-                  <p className="eyebrow">完成概况</p>
-                  <h2>当前进度</h2>
+                  <p className="eyebrow">测评进度</p>
+                  <h2>完成后告诉家长</h2>
                   <ul className="status-list">
-                    <li>{record.completion.profile ? "已完成" : "未完成"} 学生档案</li>
-                    <li>{record.completion.studentMbti ? "已完成" : "未完成"} 学生 MBTI</li>
-                    <li>{record.completion.learningMotivation ? "已完成" : "未完成"} 学习动力</li>
-                    <li>{record.completion.vark ? "已完成" : "未完成"} VARK</li>
-                    <li>{record.completion.cognition ? "已完成" : "未完成"} 学习认知</li>
-                    {roleMode === "guardian" ? (
-                      <li>{record.completion.guardianMbti ? "已完成" : "未完成"} 家长 MBTI</li>
-                    ) : null}
+                    <li>{record.completion.profile ? "已完成" : "未完成"} 基础档案</li>
+                    {studentSurveyKeys.map((key, index) => (
+                      <li key={key}>
+                        {record.completion[key] ? "已完成" : "未完成"} {studentSurveyLabels[index]}
+                      </li>
+                    ))}
                   </ul>
+                  {studentSurveyKeys.every((key) => record.completion[key]) ? (
+                    <p className="completion-note">测评完，我们会第一时间给你出测评报告！</p>
+                  ) : null}
                 </section>
               </div>
               ) : null}
