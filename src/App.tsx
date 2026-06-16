@@ -422,22 +422,24 @@ function PublicApp() {
 
   return (
     <div className="page-shell">
-      <div className="ambient ambient-a" />
-      <div className="ambient ambient-b" />
       <header className={hasStarted ? "hero-strip compact" : "hero-strip"}>
         <div>
           <p className="eyebrow">AI 提分叶路春</p>
-          <h1>{hasStarted ? "MCA学习力测评" : "测评，是你认识自己的开始！"}</h1>
+          <h1>MCA学习力测评</h1>
+          {!hasStarted ? (
+            <p className="hero-copy">测评，是你认识自己的开始。先完成一份清晰、安静的学习力画像，再把后续沟通交给老师。</p>
+          ) : null}
         </div>
         {hasStarted ? (
           <div className="access-card">
             <span>当前测评</span>
-            <strong>{roleMode === "guardian" ? "家长测评" : "学习力测评"}</strong>
+            <strong>{roleMode === "guardian" ? "独立测评" : "学习力测评"}</strong>
           </div>
         ) : (
           <div className="access-card subtle">
-            <span>测评入口</span>
-            <strong>学习力测评</strong>
+            <span>预计用时</span>
+            <strong>15-20 分钟</strong>
+            <small>自动保存进度，可分段完成</small>
           </div>
         )}
       </header>
@@ -447,13 +449,35 @@ function PublicApp() {
 
       {!hasStarted ? (
         <section className="board board-home">
-          <article className="action-card home-primary-card">
-            <p className="eyebrow">学习力测评</p>
-            <h2>MCA学习力测评</h2>
-            <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
-              {loading ? "正在进入..." : "开始测评"}
-            </button>
-          </article>
+          <div className="home-entry">
+            <article className="home-primary">
+              <p className="eyebrow">学习力测评</p>
+              <h2>完成档案与 4 项测评，生成学习画像。</h2>
+              <div className="home-actions">
+                <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
+                  {loading ? "正在进入..." : "开始测评"}
+                </button>
+                <span>无需登录</span>
+              </div>
+            </article>
+            <aside className="home-brief" aria-label="测评内容">
+              <div>
+                <span>01</span>
+                <strong>基础档案</strong>
+                <small>学校、年级与近期成绩</small>
+              </div>
+              <div>
+                <span>02</span>
+                <strong>学习偏好</strong>
+                <small>性格、风格、动力与认知</small>
+              </div>
+              <div>
+                <span>03</span>
+                <strong>进度保存</strong>
+                <small>中途离开后可继续填写</small>
+              </div>
+            </aside>
+          </div>
         </section>
       ) : null}
 
@@ -488,7 +512,7 @@ function PublicApp() {
               </div>
               <div className="survey-stage">
                 <aside className="survey-aside">
-                  <p className="eyebrow">{activeSurvey.audience === "guardian" ? "家长填写" : "学生填写"}</p>
+                  <p className="eyebrow">当前部分</p>
                   <h2>{activeSurvey.title}</h2>
                   <p>{activeSurvey.intro}</p>
                   {devMode ? (
@@ -570,7 +594,7 @@ function PublicApp() {
                     <p className="eyebrow">流程</p>
                     <div className="section-heading">
                       <div>
-                        <h2>学生档案 + 4 项测评</h2>
+                        <h2>档案 + 4 项测评</h2>
                       </div>
                       {nextStudentSurvey ? (
                         <button
@@ -622,7 +646,7 @@ function PublicApp() {
                   <div className="section-heading">
                       <div>
                         <h2>基础档案</h2>
-                        <p>填写学生信息与成绩。</p>
+                        <p>填写身份信息与近期成绩。</p>
                       </div>
                     <div className="button-row">
                       {record.completion.profile ? (
@@ -827,7 +851,7 @@ function PublicApp() {
       {showCompletionModal ? (
         <div className="modal-overlay" onClick={() => setShowCompletionModal(false)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-icon">🎉</div>
+            <div className="modal-icon">✓</div>
             <h2 className="modal-title">你已做完</h2>
             <p className="modal-body">请告知家长</p>
             <button
