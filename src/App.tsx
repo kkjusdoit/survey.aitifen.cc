@@ -63,7 +63,7 @@ function App() {
 
 function PublicApp() {
   const surveys = SURVEY_CATALOG.surveys;
-  const isGuardianUrl = window.location.pathname === "/guardian" || window.location.search.includes("role=guardian");
+  const isGuardianUrl = window.location.pathname.startsWith("/guardian") || window.location.search.includes("role=guardian");
 
   const [record, setRecord] = useState<PublicRecord | null>(null);
   const [roleMode, setRoleMode] = useState<PublicRole | null>(isGuardianUrl ? "guardian" : null);
@@ -217,7 +217,7 @@ function PublicApp() {
       setActiveSurveyKey(null);
       setSurveyDraft({});
       setQuestionIndex(0);
-      if (window.location.pathname === "/guardian" || window.location.search.includes("role=guardian")) {
+      if (window.location.pathname.startsWith("/guardian") || window.location.search.includes("role=guardian")) {
         window.history.pushState(null, "", "/");
       }
       return;
