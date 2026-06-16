@@ -260,6 +260,13 @@ small {
   font-weight: 800;
 }
 
+.flow-card {
+  border-color: rgba(46, 110, 105, 0.22);
+  background:
+    linear-gradient(135deg, rgba(46, 110, 105, 0.12), rgba(255, 255, 255, 0.86)),
+    var(--panel);
+}
+
 .stack-card {
   display: grid;
   gap: 18px;
@@ -358,6 +365,10 @@ small {
 .dashboard {
   grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
   align-items: start;
+}
+
+.dashboard.student-flow {
+  grid-template-columns: 1fr;
 }
 
 .dashboard-column {

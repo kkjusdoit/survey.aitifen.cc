@@ -51,7 +51,7 @@ const studentSurveyKeys: SurveyKey[] = [
   "vark",
   "cognition",
 ];
-const studentSurveyLabels = ["MBTI 测评", "学习动力", "VARK", "学习认知"];
+const isStudentSurveyKey = (surveyKey: SurveyKey) => studentSurveyKeys.includes(surveyKey);
 
 const devMode = import.meta.env.DEV;
 type PublicRole = "student" | "guardian";
@@ -63,7 +63,10 @@ function App() {
 
 function PublicApp() {
   const surveys = SURVEY_CATALOG.surveys;
-  const isGuardianUrl = window.location.pathname.startsWith("/guardian") || window.location.search.includes("role=guardian");
+  const isGuardianUrl =
+    window.location.pathname === "/guardian" ||
+    window.location.pathname.startsWith("/guardian/") ||
+    window.location.search.includes("role=guardian");
 
   const [record, setRecord] = useState<PublicRecord | null>(null);
   const [roleMode, setRoleMode] = useState<PublicRole | null>(isGuardianUrl ? "guardian" : null);
@@ -213,13 +216,10 @@ function PublicApp() {
 
   const handleSurveyBack = () => {
     if (roleMode === "guardian" && !record) {
-      setRoleMode(null);
-      setActiveSurveyKey(null);
+      setRoleMode("guardian");
+      setActiveSurveyKey("guardianMbti");
       setSurveyDraft({});
       setQuestionIndex(0);
-      if (window.location.pathname.startsWith("/guardian") || window.location.search.includes("role=guardian")) {
-        window.history.pushState(null, "", "/");
-      }
       return;
     }
     setActiveSurveyKey(null);
@@ -277,6 +277,17 @@ function PublicApp() {
         )
       : null;
   const hasStarted = Boolean(record) || roleMode === "guardian";
+  const completedStudentSurveyCount = record
+    ? studentSurveyKeys.filter((key) => record.completion[key]).length
+    : 0;
+  const nextStudentSurveyKey =
+    record && roleMode !== "guardian"
+      ? studentSurveyKeys.find((key) => !record.completion[key]) ?? null
+      : null;
+  const nextStudentSurvey = nextStudentSurveyKey
+    ? surveys.find((survey) => survey.key === nextStudentSurveyKey) ?? null
+    : null;
+  const studentSurveysCompleted = completedStudentSurveyCount === studentSurveyKeys.length;
 
   const fillProfileSample = () => {
     setProfileDraft({
@@ -406,9 +417,15 @@ function PublicApp() {
           {activeSurvey ? (
             <div className="survey-shell">
               <div className="survey-topbar">
-                <button type="button" className="ghost" onClick={handleSurveyBack}>
-                  {roleMode === "guardian" && !record ? "返回首页" : "返回总览"}
-                </button>
+                {roleMode === "guardian" && !record ? (
+                  <button type="button" className="ghost" onClick={handleSurveyBack}>
+                    重新开始
+                  </button>
+                ) : (
+                  <button type="button" className="ghost" onClick={handleSurveyBack}>
+                    返回总览
+                  </button>
+                )}
                 <div className="survey-meta">
                   <span>{activeSurvey.shortTitle}</span>
                   <strong>
@@ -483,7 +500,7 @@ function PublicApp() {
                           onClick={handleCompleteSurvey}
                           disabled={loading || !surveyDraft[activeQuestion.id]}
                         >
-                          {roleMode === "guardian" && !record ? "提交并查看结果" : "完成并保存"}
+                          {roleMode === "guardian" && !record ? "提交并查看结果" : "提交"}
                         </button>
                       )}
                     </div>
@@ -492,7 +509,7 @@ function PublicApp() {
               </div>
             </div>
           ) : (
-            <div className="dashboard">
+            <div className={roleMode === "guardian" ? "dashboard" : "dashboard student-flow"}>
               {showGuardianReport && guardianResult ? (
                 <div className="dashboard-column wide">
                   <GuardianResultReport
@@ -678,6 +695,34 @@ function PublicApp() {
                   </ol>
                 </section>
 
+                <section className="stack-card flow-card">
+                  <p className="eyebrow">当前进度</p>
+                  <div className="section-heading">
+                    <div>
+                      <h2>{completedStudentSurveyCount} / {studentSurveyKeys.length} 项已提交</h2>
+                      <p>
+                        {studentSurveysCompleted
+                          ? "四项测评已经完成。"
+                          : nextStudentSurvey
+                            ? `下一项：${nextStudentSurvey.shortTitle}`
+                            : "请继续完成下一项。"}
+                      </p>
+                    </div>
+                    {nextStudentSurvey ? (
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => handleOpenSurvey(nextStudentSurvey.key)}
+                      >
+                        继续填下一项
+                      </button>
+                    ) : null}
+                  </div>
+                  {studentSurveysCompleted ? (
+                    <p className="completion-note">测评完，我们会第一时间给你出测评报告！</p>
+                  ) : null}
+                </section>
+
                 <section className="stack-card">
                   <div className="section-heading">
                     <div>
@@ -687,7 +732,7 @@ function PublicApp() {
                   </div>
                   <div className="survey-card-grid">
                     {surveys
-                      .filter((survey) => studentSurveyKeys.includes(survey.key))
+                      .filter((survey) => isStudentSurveyKey(survey.key))
                       .map((survey) => (
                         <SurveyCard
                           key={survey.key}
@@ -705,7 +750,7 @@ function PublicApp() {
               </div>
               ) : null}
 
-              {record ? (
+              {record && roleMode === "guardian" ? (
               <div className="dashboard-column">
                 {roleMode === "guardian" ? (
                   <section className="stack-card">
@@ -739,21 +784,6 @@ function PublicApp() {
                   </section>
                 ) : null}
 
-                <section className="stack-card">
-                  <p className="eyebrow">测评进度</p>
-                  <h2>完成后告诉家长</h2>
-                  <ul className="status-list">
-                    <li>{record.completion.profile ? "已完成" : "未完成"} 基础档案</li>
-                    {studentSurveyKeys.map((key, index) => (
-                      <li key={key}>
-                        {record.completion[key] ? "已完成" : "未完成"} {studentSurveyLabels[index]}
-                      </li>
-                    ))}
-                  </ul>
-                  {studentSurveyKeys.every((key) => record.completion[key]) ? (
-                    <p className="completion-note">测评完，我们会第一时间给你出测评报告！</p>
-                  ) : null}
-                </section>
               </div>
               ) : null}
             </div>
