@@ -45,6 +45,12 @@ export function createRecord() {
   });
 }
 
+export function getPublicRecord(accessCode: string) {
+  return apiRequest<{ record: PublicRecord }>(
+    `/api/public/records/${encodeURIComponent(accessCode)}`,
+  );
+}
+
 export function saveProfile(accessCode: string, profile: StudentProfile) {
   return apiRequest<{ record: PublicRecord }>(
     `/api/public/records/${encodeURIComponent(accessCode)}/profile`,
@@ -98,6 +104,20 @@ export function deleteAdminRecord(id: string, token: string) {
     { method: "DELETE" },
     token,
   );
+}
+
+export async function downloadAdminRecordJson(id: string, token: string) {
+  const response = await fetch(`/api/admin/records/${encodeURIComponent(id)}/export.json`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Record export failed");
+  }
+
+  return await response.blob();
 }
 
 export async function downloadAdminCsv(token: string) {

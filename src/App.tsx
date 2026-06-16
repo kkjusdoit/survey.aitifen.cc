@@ -6,7 +6,9 @@ import {
   createRecord,
   deleteAdminRecord,
   downloadAdminCsv,
+  downloadAdminRecordJson,
   getAdminRecord,
+  getPublicRecord,
   listAdminRecords,
   saveProfile,
   saveSurveySection,
@@ -23,6 +25,7 @@ import type {
 } from "./types";
 
 const tokenStorageKey = "ai-tifen-admin-token";
+const publicRecordStorageKey = "mca-learning-assessment-access-code";
 
 const blankProfile = (): StudentProfile => ({
   studentName: "",
@@ -79,6 +82,7 @@ function PublicApp() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [showGuardianReport, setShowGuardianReport] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const debounceTimer = useRef<number | null>(null);
   const transitionTimer = useRef<number | null>(null);
   const draftHydrated = useRef(isGuardianUrl);
@@ -87,6 +91,36 @@ function PublicApp() {
     () => surveys.find((survey) => survey.key === activeSurveyKey) ?? null,
     [activeSurveyKey, surveys],
   );
+
+  useEffect(() => {
+    if (isGuardianUrl || record) {
+      return;
+    }
+    const accessCode = localStorage.getItem(publicRecordStorageKey);
+    if (!accessCode) {
+      return;
+    }
+
+    let cancelled = false;
+    void getPublicRecord(accessCode)
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+        setRecord(response.record);
+        setRoleMode("student");
+        setProfileDraft(response.record.profile);
+        setProfileCollapsed(response.record.completion.profile);
+        setLastSavedAt(formatTime(response.record.updatedAt));
+      })
+      .catch(() => {
+        localStorage.removeItem(publicRecordStorageKey);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuardianUrl, record]);
 
   useEffect(() => {
     if (!record || !activeSurvey || !draftHydrated.current) {
@@ -105,6 +139,7 @@ function PublicApp() {
           record.sections[activeSurvey.key].completed,
         );
         setRecord(response.record);
+        localStorage.setItem(publicRecordStorageKey, response.record.accessCode);
         setLastSavedAt(formatTime(response.record.updatedAt));
       } catch {
         setError("自动保存失败，请稍后重试。");
@@ -136,6 +171,7 @@ function PublicApp() {
     try {
       const response = await createRecord();
       setRecord(response.record);
+      localStorage.setItem(publicRecordStorageKey, response.record.accessCode);
       setRoleMode(role);
       setProfileDraft(response.record.profile);
       setProfileCollapsed(false);
@@ -156,6 +192,7 @@ function PublicApp() {
     try {
       const response = await saveProfile(record.accessCode, profileDraft);
       setRecord(response.record);
+      localStorage.setItem(publicRecordStorageKey, response.record.accessCode);
       setProfileDraft(response.record.profile);
       setProfileCollapsed(response.record.completion.profile);
       setLastSavedAt(formatTime(response.record.updatedAt));
@@ -248,16 +285,24 @@ function PublicApp() {
     setLoading(true);
     setError("");
     try {
+      const wasCompleted = studentSurveyKeys.every((key) => record.completion[key]);
       const response = await saveSurveySection(
         record.accessCode,
         activeSurvey.key,
         surveyDraft,
         true,
       );
+      const isCompletedNow = studentSurveyKeys.every((key) => response.record.completion[key]);
+
       setRecord(response.record);
+      localStorage.setItem(publicRecordStorageKey, response.record.accessCode);
       setActiveSurveyKey(null);
       setShowGuardianReport(activeSurvey.key === "guardianMbti");
       setLastSavedAt(formatTime(response.record.updatedAt));
+
+      if (!wasCompleted && isCompletedNow && roleMode === "student") {
+        setShowCompletionModal(true);
+      }
     } catch (requestError) {
       setError(getMessage(requestError, "提交测评失败"));
     } finally {
@@ -365,6 +410,9 @@ function PublicApp() {
       setRecord(nextRecord);
       setProfileDraft(nextRecord.profile);
       setLastSavedAt(formatTime(nextRecord.updatedAt));
+      if (roleMode === "student") {
+        setShowCompletionModal(true);
+      }
     } catch (requestError) {
       setError(getMessage(requestError, "开发环境快速填充失败"));
     } finally {
@@ -378,25 +426,18 @@ function PublicApp() {
       <div className="ambient ambient-b" />
       <header className={hasStarted ? "hero-strip compact" : "hero-strip"}>
         <div>
-          <p className="eyebrow">MCA学习力测评</p>
+          <p className="eyebrow">AI 提分叶路春</p>
           <h1>{hasStarted ? "MCA学习力测评" : "测评，是你认识自己的开始！"}</h1>
-          <p className="hero-copy">
-            {hasStarted
-              ? "学生完成档案和 4 项测评，数据自动进入后台。"
-              : "完成学生档案与 4 项测评，提交后后台自动汇总数据。"}
-          </p>
         </div>
         {hasStarted ? (
           <div className="access-card">
             <span>当前测评</span>
             <strong>{roleMode === "guardian" ? "家长测评" : "学习力测评"}</strong>
-            <small>{roleMode === "guardian" ? "提交后查看结果。" : "档案 + 4 项测评"}</small>
           </div>
         ) : (
           <div className="access-card subtle">
             <span>测评入口</span>
             <strong>学习力测评</strong>
-            <small>基础档案 + 4 项测评</small>
           </div>
         )}
       </header>
@@ -409,7 +450,6 @@ function PublicApp() {
           <article className="action-card home-primary-card">
             <p className="eyebrow">学习力测评</p>
             <h2>MCA学习力测评</h2>
-            <p>学生填写档案并依次完成 4 项测评。</p>
             <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
               {loading ? "正在进入..." : "开始测评"}
             </button>
@@ -531,7 +571,6 @@ function PublicApp() {
                     <div className="section-heading">
                       <div>
                         <h2>学生档案 + 4 项测评</h2>
-                        <p>全部提交后，后台可查看并下载完整数据。</p>
                       </div>
                       {nextStudentSurvey ? (
                         <button
@@ -573,7 +612,7 @@ function PublicApp() {
                       ))}
                     </div>
                     {studentSurveysCompleted ? (
-                      <p className="completion-note">已完成提交，后台可下载完整数据。</p>
+                      <p className="completion-note">已完成</p>
                     ) : null}
                   </section>
                 ) : null}
@@ -751,7 +790,6 @@ function PublicApp() {
                   <section className="stack-card">
                     <p className="eyebrow">家长任务</p>
                     <h2>家长 MBTI 结果</h2>
-                    <p>家长独立完成测评后，会直接生成结果页，方便当场查看和截图反馈。</p>
                     {guardianSurvey ? (
                       <SurveyCard
                         survey={guardianSurvey}
@@ -785,8 +823,29 @@ function PublicApp() {
           )}
         </section>
       ) : null}
+      <SiteFooter />
+      {showCompletionModal ? (
+        <div className="modal-overlay" onClick={() => setShowCompletionModal(false)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-icon">🎉</div>
+            <h2 className="modal-title">你已做完</h2>
+            <p className="modal-body">请告知家长</p>
+            <button
+              type="button"
+              className="primary modal-btn"
+              onClick={() => setShowCompletionModal(false)}
+            >
+              我知道了
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function SiteFooter() {
+  return <footer className="site-footer">Powered by AI 提分叶路春</footer>;
 }
 
 function SurveyCard({
@@ -892,6 +951,23 @@ function AdminApp() {
       const anchor = document.createElement("a");
       anchor.href = href;
       anchor.download = "assessment-records.csv";
+      anchor.click();
+      URL.revokeObjectURL(href);
+    } catch (requestError) {
+      setError(getMessage(requestError, "导出失败"));
+    }
+  };
+
+  const handleExportSelected = async () => {
+    if (!token || !selected) {
+      return;
+    }
+    try {
+      const blob = await downloadAdminRecordJson(selected.id, token);
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = `${selected.profile.studentName || selected.accessCode}-assessment.json`;
       anchor.click();
       URL.revokeObjectURL(href);
     } catch (requestError) {
@@ -1034,6 +1110,14 @@ function AdminApp() {
                     <div className="detail-actions">
                       <button
                         type="button"
+                        className="secondary"
+                        onClick={handleExportSelected}
+                        disabled={loading}
+                      >
+                        导出本条 JSON
+                      </button>
+                      <button
+                        type="button"
                         className="danger-button"
                         onClick={() => void handleDelete(selected.id)}
                         disabled={loading}
@@ -1145,6 +1229,7 @@ function AdminApp() {
           </div>
         </section>
       )}
+      <SiteFooter />
     </div>
   );
 }

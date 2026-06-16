@@ -64,7 +64,7 @@ export function GuardianResultReport({
               </div>
             ))}
           </div>
-          <small className="screenshot-tip">首屏适合直接截图发给家长查看。</small>
+          <small className="screenshot-tip">首屏可截图保存。</small>
         </article>
 
         <article className="report-card">

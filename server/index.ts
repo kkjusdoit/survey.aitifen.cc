@@ -220,6 +220,49 @@ const flattenAnswerColumns = (record: PublicRecord) =>
     }),
   );
 
+const buildSingleRecordExport = (record: PublicRecord) => ({
+  exportPurpose: "single-student-ai-analysis",
+  exportedAt: new Date().toISOString(),
+  record: {
+    id: record.id,
+    accessCode: record.accessCode,
+    ownerLabel: record.ownerLabel,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  },
+  profile: record.profile,
+  completion: record.completion,
+  surveys: SURVEY_CATALOG.surveys.map((survey) => {
+    const section = record.sections[survey.key];
+    const answers = survey.questions.map((question, index) => {
+      const answerId = section.answers[question.id] ?? "";
+      const option = question.options.find((item) => item.id === answerId);
+      return {
+        index: index + 1,
+        questionId: question.id,
+        prompt: question.prompt,
+        answerId,
+        answerLabel: option?.label ?? "",
+        trait: option?.trait ?? null,
+        answered: Boolean(option),
+      };
+    });
+
+    return {
+      key: survey.key,
+      title: survey.title,
+      shortTitle: survey.shortTitle,
+      audience: survey.audience,
+      completed: section.completed,
+      updatedAt: section.updatedAt,
+      completedAt: section.completedAt,
+      answeredCount: answers.filter((answer) => answer.answered).length,
+      totalQuestions: survey.questions.length,
+      answers,
+    };
+  }),
+});
+
 const makeAccessCode = () => {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
@@ -590,6 +633,20 @@ export default {
           return text(`\uFEFF${[header.map(csvEscape).join(","), ...csvRows].join("\n")}`, 200, {
             "Content-Type": "text/csv; charset=utf-8",
             "Content-Disposition": 'attachment; filename="assessment-records.csv"',
+          });
+        }
+
+        const recordExportMatch = pathname.match(/^\/api\/admin\/records\/([^/]+)\/export\.json$/);
+        if (request.method === "GET" && recordExportMatch) {
+          const recordId = decodeURIComponent(recordExportMatch[1]);
+          const row = await getRecordById(env.DB, recordId);
+          if (!row) {
+            return text("Record not found", 404);
+          }
+          const record = rowToRecord(row);
+          const filename = `${record.profile.studentName || record.accessCode}-assessment.json`;
+          return json(buildSingleRecordExport(record), 200, {
+            "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
           });
         }
 
