@@ -49,6 +49,18 @@ export const SURVEY_CATALOG: SurveyCatalog = {
       {
         "key": "biology",
         "label": "生物"
+      },
+      {
+        "key": "politics",
+        "label": "政治"
+      },
+      {
+        "key": "history",
+        "label": "历史"
+      },
+      {
+        "key": "geography",
+        "label": "地理"
       }
     ]
   },

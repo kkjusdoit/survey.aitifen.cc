@@ -54,6 +54,9 @@ const emptyProfile = (): StudentProfile => ({
     physics: "",
     chemistry: "",
     biology: "",
+    politics: "",
+    history: "",
+    geography: "",
   },
   scoreNotes: "",
 });
@@ -124,16 +127,12 @@ const mergeProfile = (input: Partial<StudentProfile>): StudentProfile => {
 };
 
 const profileIsComplete = (profile: StudentProfile) => {
-  const requiredFields = [
-    profile.studentName,
-    profile.schoolName,
-    profile.grade,
-    profile.gender,
-    profile.guardianName,
-    profile.guardianRole,
+  const coreScores = [
+    profile.subjectScores.chinese,
+    profile.subjectScores.math,
+    profile.subjectScores.english,
   ];
-  const hasAtLeastOneScore = Object.values(profile.subjectScores).some(Boolean) || Boolean(profile.scoreNotes);
-  return requiredFields.every(Boolean) && hasAtLeastOneScore;
+  return Boolean(profile.studentName) || coreScores.some(Boolean) || Boolean(profile.scoreNotes);
 };
 
 const hydrateSections = (input: Partial<SurveySections>): SurveySections => {
@@ -526,7 +525,7 @@ export default {
             ),
           );
           const header = [
-            "续填码",
+            "内部编号",
             "归属",
             "学生姓名",
             "学校全称",
@@ -540,6 +539,9 @@ export default {
             "物理",
             "化学",
             "生物",
+            "政治",
+            "历史",
+            "地理",
             "成绩备注",
             "档案完成",
             "学生MBTI完成",
@@ -568,6 +570,9 @@ export default {
               record.profile.subjectScores.physics,
               record.profile.subjectScores.chemistry,
               record.profile.subjectScores.biology,
+              record.profile.subjectScores.politics,
+              record.profile.subjectScores.history,
+              record.profile.subjectScores.geography,
               record.profile.scoreNotes,
               String(record.completion.profile),
               String(record.completion.studentMbti),

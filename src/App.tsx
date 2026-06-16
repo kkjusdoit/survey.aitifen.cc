@@ -8,7 +8,6 @@ import {
   downloadAdminCsv,
   getAdminRecord,
   listAdminRecords,
-  resumeRecord,
   saveProfile,
   saveSurveySection,
 } from "./lib/api";
@@ -39,6 +38,9 @@ const blankProfile = (): StudentProfile => ({
     physics: "",
     chemistry: "",
     biology: "",
+    politics: "",
+    history: "",
+    geography: "",
   },
   scoreNotes: "",
 });
@@ -51,6 +53,7 @@ const studentSurveyKeys: SurveyKey[] = [
 ];
 
 const devMode = import.meta.env.DEV;
+type PublicRole = "student" | "guardian";
 
 function App() {
   const isAdminRoute = window.location.pathname.startsWith("/admin");
@@ -59,8 +62,8 @@ function App() {
 
 function PublicApp() {
   const surveys = SURVEY_CATALOG.surveys;
-  const [accessCodeInput, setAccessCodeInput] = useState("");
   const [record, setRecord] = useState<PublicRecord | null>(null);
+  const [roleMode, setRoleMode] = useState<PublicRole | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [profileDraft, setProfileDraft] = useState<StudentProfile>(blankProfile());
@@ -69,7 +72,6 @@ function PublicApp() {
   const [surveyDraft, setSurveyDraft] = useState<AnswerMap>({});
   const [questionIndex, setQuestionIndex] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState("");
-  const [homeMode, setHomeMode] = useState<"menu" | "new" | "resume">("menu");
   const [showGuardianReport, setShowGuardianReport] = useState(false);
   const debounceTimer = useRef<number | null>(null);
   const draftHydrated = useRef(false);
@@ -109,40 +111,24 @@ function PublicApp() {
     };
   }, [activeSurvey, record, surveyDraft]);
 
-  const handleCreateRecord = async () => {
+  const handleStart = async (role: PublicRole) => {
     setLoading(true);
     setError("");
     try {
       const response = await createRecord();
       setRecord(response.record);
+      setRoleMode(role);
       setProfileDraft(response.record.profile);
       setProfileCollapsed(false);
       setShowGuardianReport(false);
-      setHomeMode("menu");
+      if (role === "guardian") {
+        draftHydrated.current = false;
+        setSurveyDraft(response.record.sections.guardianMbti.answers);
+        setQuestionIndex(0);
+        setActiveSurveyKey("guardianMbti");
+      }
     } catch (requestError) {
-      setError(getMessage(requestError, "创建档案失败"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResume = async () => {
-    if (!accessCodeInput.trim()) {
-      setError("请输入续填码。");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const response = await resumeRecord(accessCodeInput.trim().toUpperCase());
-      setRecord(response.record);
-      setProfileDraft(response.record.profile);
-      setProfileCollapsed(response.record.completion.profile);
-      setShowGuardianReport(false);
-      setAccessCodeInput("");
-      setHomeMode("menu");
-    } catch (requestError) {
-      setError(getMessage(requestError, "没有找到对应档案"));
+      setError(getMessage(requestError, "进入测评失败，请刷新后重试"));
     } finally {
       setLoading(false);
     }
@@ -253,6 +239,9 @@ function PublicApp() {
         physics: "92",
         chemistry: "88",
         biology: "A",
+        politics: "A",
+        history: "A",
+        geography: "A",
       },
       scoreNotes: "开发环境样例数据，用于快速回归。",
     });
@@ -289,6 +278,9 @@ function PublicApp() {
           physics: "92",
           chemistry: "88",
           biology: "A",
+          politics: "A",
+          history: "A",
+          geography: "A",
         },
         scoreNotes: "开发环境一键填充完整记录。",
       } satisfies StudentProfile;
@@ -323,20 +315,20 @@ function PublicApp() {
           <p className="eyebrow">AI 提分叶路春</p>
           <h1>个性化教育前置信息采集</h1>
           <p className="hero-copy">
-            为家长和学生拆分填写节奏。先建档，再按角色分别完成 5 个测评，后台统一查看。
+            学生填写基础档案和 4 项测评；家长单独完成 MBTI，并当场看到截图友好的结果页。
           </p>
         </div>
         {record ? (
           <div className="access-card">
-            <span>续填码</span>
-            <strong>{record.accessCode}</strong>
-            <small>家长和学生不在同一时间填写时，使用同一个续填码继续。</small>
+            <span>当前填写</span>
+            <strong>{roleMode === "guardian" ? "家长测评" : "学生测评"}</strong>
+            <small>{roleMode === "guardian" ? "完成后直接生成 MBTI 结果页。" : "填写档案后完成 4 项学生测评。"}</small>
           </div>
         ) : (
           <div className="access-card subtle">
             <span>填写方式</span>
-            <strong>轻量续填登录</strong>
-            <small>不做注册账号，用续填码衔接家长和学生分时填写。</small>
+            <strong>选择身份开始</strong>
+            <small>不用注册账号，不需要理解任何内部编号。</small>
           </div>
         )}
       </header>
@@ -346,75 +338,24 @@ function PublicApp() {
 
       {!record ? (
         <section className="board board-home">
-          <div className="home-switch">
-            <button
-              className={homeMode === "menu" ? "chip active" : "chip"}
-              type="button"
-              onClick={() => setHomeMode("menu")}
-            >
-              开始
-            </button>
-            <button
-              className={homeMode === "new" ? "chip active" : "chip"}
-              type="button"
-              onClick={() => setHomeMode("new")}
-            >
-              新建档案
-            </button>
-            <button
-              className={homeMode === "resume" ? "chip active" : "chip"}
-              type="button"
-              onClick={() => setHomeMode("resume")}
-            >
-              继续填写
-            </button>
+          <div className="home-grid">
+            <article className="action-card">
+              <p className="eyebrow">学生填写</p>
+              <h2>基础档案 + 4 项测评</h2>
+              <p>先填学习档案，再完成学生 MBTI、学习动力、VARK、学习认知。后台可下载原始数据。</p>
+              <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
+                {loading ? "正在进入..." : "我是学生，开始填写"}
+              </button>
+            </article>
+            <article className="action-card">
+              <p className="eyebrow">家长填写</p>
+              <h2>家长 MBTI 测评</h2>
+              <p>家长单独完成测评，提交后立刻看到 MBTI 结果页，适合截图反馈。</p>
+              <button type="button" className="secondary" onClick={() => handleStart("guardian")} disabled={loading}>
+                {loading ? "正在进入..." : "我是家长，开始测评"}
+              </button>
+            </article>
           </div>
-
-          {homeMode === "menu" ? (
-            <div className="home-grid">
-              <article className="action-card">
-                <h2>为孩子新建一份测评档案</h2>
-                <p>系统会生成一个续填码，之后家长和学生可以分开进入填写。</p>
-                <button type="button" className="primary" onClick={() => setHomeMode("new")}>
-                  去新建
-                </button>
-              </article>
-              <article className="action-card">
-                <h2>已有续填码，继续填写</h2>
-                <p>适合家长先建档、学生晚些填写，或者家长回来补完 93 题 MBTI。</p>
-                <button type="button" className="secondary" onClick={() => setHomeMode("resume")}>
-                  去续填
-                </button>
-              </article>
-            </div>
-          ) : null}
-
-          {homeMode === "new" ? (
-            <div className="stack-card narrow">
-              <h2>生成新档案</h2>
-              <p>新建后马上拿到续填码，再决定先让家长填还是先让学生填。</p>
-              <button type="button" className="primary" onClick={handleCreateRecord} disabled={loading}>
-                {loading ? "正在生成..." : "生成续填码"}
-              </button>
-            </div>
-          ) : null}
-
-          {homeMode === "resume" ? (
-            <div className="stack-card narrow">
-              <h2>输入续填码</h2>
-              <label className="field">
-                <span>续填码</span>
-                <input
-                  value={accessCodeInput}
-                  onChange={(event) => setAccessCodeInput(event.target.value.toUpperCase())}
-                  placeholder="例如 A3K9M2QF"
-                />
-              </label>
-              <button type="button" className="primary" onClick={handleResume} disabled={loading}>
-                {loading ? "读取中..." : "进入档案"}
-              </button>
-            </div>
-          ) : null}
         </section>
       ) : null}
 
@@ -515,7 +456,7 @@ function PublicApp() {
                   <GuardianResultReport
                     result={guardianResult}
                     guardianName={record.profile.guardianName}
-                    onBack={() => setShowGuardianReport(false)}
+                    onBack={roleMode === "guardian" ? undefined : () => setShowGuardianReport(false)}
                   />
                 </div>
               ) : (
@@ -553,8 +494,7 @@ function PublicApp() {
                         {profileDraft.studentName || "未填写姓名"} / {profileDraft.schoolName || "未填写学校"}
                       </p>
                       <p>
-                        {profileDraft.grade || "未填写年级"} / {profileDraft.gender || "未填写性别"} /{" "}
-                        {profileDraft.guardianName || "未填写家长"} / {profileDraft.guardianRole || "未填写身份"}
+                        {profileDraft.grade || "未填写年级"} / {profileDraft.gender || "未填写性别"}
                       </p>
                       <p>
                         {SURVEY_CATALOG.profile.subjectFields
@@ -626,37 +566,6 @@ function PublicApp() {
                           >
                             <option value="">请选择</option>
                             {SURVEY_CATALOG.profile.genderOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>家长姓名</span>
-                          <input
-                            value={profileDraft.guardianName}
-                            onChange={(event) =>
-                              setProfileDraft((current) => ({
-                                ...current,
-                                guardianName: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-                        <label className="field">
-                          <span>家长身份</span>
-                          <select
-                            value={profileDraft.guardianRole}
-                            onChange={(event) =>
-                              setProfileDraft((current) => ({
-                                ...current,
-                                guardianRole: event.target.value,
-                              }))
-                            }
-                          >
-                            <option value="">请选择</option>
-                            {SURVEY_CATALOG.profile.guardianRoleOptions.map((option) => (
                               <option key={option} value={option}>
                                 {option}
                               </option>
@@ -744,35 +653,37 @@ function PublicApp() {
               )}
 
               <div className="dashboard-column">
-                <section className="stack-card">
-                  <p className="eyebrow">家长任务</p>
-                  <h2>家长 MBTI 结果</h2>
-                  <p>家长独立完成测评后，会直接生成结果页，方便当场查看和截图反馈。</p>
-                  {guardianSurvey ? (
-                    <SurveyCard
-                      survey={guardianSurvey}
-                      completed={record.completion.guardianMbti}
-                      answeredCount={countAnswered(
-                        guardianSurvey,
-                        record.sections.guardianMbti.answers,
-                      )}
-                      onOpen={() => handleOpenSurvey("guardianMbti")}
-                    />
-                  ) : null}
-                  {guardianResult ? (
-                    <div className="mini-result">
-                      <span>当前 MBTI</span>
-                      <strong>{guardianResult.typeCode}</strong>
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => setShowGuardianReport(true)}
-                      >
-                        查看结果页
-                      </button>
-                    </div>
-                  ) : null}
-                </section>
+                {roleMode === "guardian" ? (
+                  <section className="stack-card">
+                    <p className="eyebrow">家长任务</p>
+                    <h2>家长 MBTI 结果</h2>
+                    <p>家长独立完成测评后，会直接生成结果页，方便当场查看和截图反馈。</p>
+                    {guardianSurvey ? (
+                      <SurveyCard
+                        survey={guardianSurvey}
+                        completed={record.completion.guardianMbti}
+                        answeredCount={countAnswered(
+                          guardianSurvey,
+                          record.sections.guardianMbti.answers,
+                        )}
+                        onOpen={() => handleOpenSurvey("guardianMbti")}
+                      />
+                    ) : null}
+                    {guardianResult ? (
+                      <div className="mini-result">
+                        <span>当前 MBTI</span>
+                        <strong>{guardianResult.typeCode}</strong>
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => setShowGuardianReport(true)}
+                        >
+                          查看结果页
+                        </button>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
 
                 <section className="stack-card">
                   <p className="eyebrow">完成概况</p>
@@ -783,7 +694,9 @@ function PublicApp() {
                     <li>{record.completion.learningMotivation ? "已完成" : "未完成"} 学习动力</li>
                     <li>{record.completion.vark ? "已完成" : "未完成"} VARK</li>
                     <li>{record.completion.cognition ? "已完成" : "未完成"} 学习认知</li>
-                    <li>{record.completion.guardianMbti ? "已完成" : "未完成"} 家长 MBTI</li>
+                    {roleMode === "guardian" ? (
+                      <li>{record.completion.guardianMbti ? "已完成" : "未完成"} 家长 MBTI</li>
+                    ) : null}
                   </ul>
                 </section>
               </div>
@@ -996,7 +909,7 @@ function AdminApp() {
                       <tr>
                         <th>学生</th>
                         <th>学校</th>
-                        <th>续填码</th>
+                        <th>内部编号</th>
                         <th>进度</th>
                         <th>更新时间</th>
                         <th>操作</th>
@@ -1220,6 +1133,9 @@ function subjectLabel(key: string) {
     physics: "物理",
     chemistry: "化学",
     biology: "生物",
+    politics: "政治",
+    history: "历史",
+    geography: "地理",
   };
   return map[key] ?? key;
 }

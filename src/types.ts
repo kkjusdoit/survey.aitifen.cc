@@ -51,7 +51,10 @@ export type SubjectKey =
   | "english"
   | "physics"
   | "chemistry"
-  | "biology";
+  | "biology"
+  | "politics"
+  | "history"
+  | "geography";
 
 export type SubjectScores = Record<SubjectKey, string>;
 

@@ -45,12 +45,6 @@ export function createRecord() {
   });
 }
 
-export function resumeRecord(accessCode: string) {
-  return apiRequest<{ record: PublicRecord }>(
-    `/api/public/records/${encodeURIComponent(accessCode)}`,
-  );
-}
-
 export function saveProfile(accessCode: string, profile: StudentProfile) {
   return apiRequest<{ record: PublicRecord }>(
     `/api/public/records/${encodeURIComponent(accessCode)}/profile`,
