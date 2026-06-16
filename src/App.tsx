@@ -288,6 +288,7 @@ function PublicApp() {
     ? surveys.find((survey) => survey.key === nextStudentSurveyKey) ?? null
     : null;
   const studentSurveysCompleted = completedStudentSurveyCount === studentSurveyKeys.length;
+  const studentFlowSurveys = surveys.filter((survey) => isStudentSurveyKey(survey.key));
 
   const fillProfileSample = () => {
     setProfileDraft({
@@ -375,17 +376,21 @@ function PublicApp() {
     <div className="page-shell">
       <div className="ambient ambient-a" />
       <div className="ambient ambient-b" />
-      <header className="hero-strip">
+      <header className={hasStarted ? "hero-strip compact" : "hero-strip"}>
         <div>
           <p className="eyebrow">MCA学习力测评</p>
-          <h1>测评，是你认识自己的开始！</h1>
-          <p className="hero-copy">请按提示完成测评，完成后我们会第一时间为您出具测评报告。</p>
+          <h1>{hasStarted ? "MCA学习力测评" : "测评，是你认识自己的开始！"}</h1>
+          <p className="hero-copy">
+            {hasStarted
+              ? "学生完成档案和 4 项测评，数据自动进入后台。"
+              : "完成学生档案与 4 项测评，提交后后台自动汇总数据。"}
+          </p>
         </div>
         {hasStarted ? (
           <div className="access-card">
             <span>当前测评</span>
             <strong>{roleMode === "guardian" ? "家长测评" : "学习力测评"}</strong>
-            <small>{roleMode === "guardian" ? "提交后查看结果。" : "填完一项提交，再继续下一项。"}</small>
+            <small>{roleMode === "guardian" ? "提交后查看结果。" : "档案 + 4 项测评"}</small>
           </div>
         ) : (
           <div className="access-card subtle">
@@ -404,7 +409,7 @@ function PublicApp() {
           <article className="action-card home-primary-card">
             <p className="eyebrow">学习力测评</p>
             <h2>MCA学习力测评</h2>
-            <p>先填写基础档案，再完成 4 项测评。</p>
+            <p>学生填写档案并依次完成 4 项测评。</p>
             <button type="button" className="primary" onClick={() => handleStart("student")} disabled={loading}>
               {loading ? "正在进入..." : "开始测评"}
             </button>
@@ -520,12 +525,65 @@ function PublicApp() {
                 </div>
               ) : record ? (
               <div className="dashboard-column wide">
+                {roleMode !== "guardian" ? (
+                  <section className="stack-card flow-card">
+                    <p className="eyebrow">流程</p>
+                    <div className="section-heading">
+                      <div>
+                        <h2>学生档案 + 4 项测评</h2>
+                        <p>全部提交后，后台可查看并下载完整数据。</p>
+                      </div>
+                      {nextStudentSurvey ? (
+                        <button
+                          type="button"
+                          className="primary"
+                          onClick={() => handleOpenSurvey(nextStudentSurvey.key)}
+                          disabled={!record.completion.profile}
+                        >
+                          继续：{nextStudentSurvey.shortTitle}
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="flow-steps">
+                      <div className={record.completion.profile ? "flow-step done" : "flow-step current"}>
+                        <span>1</span>
+                        <div>
+                          <strong>基础档案</strong>
+                          <small>{record.completion.profile ? "已保存" : "待保存"}</small>
+                        </div>
+                      </div>
+                      {studentFlowSurveys.map((survey, index) => (
+                        <button
+                          key={survey.key}
+                          type="button"
+                          className={record.completion[survey.key] ? "flow-step done" : "flow-step"}
+                          onClick={() => handleOpenSurvey(survey.key)}
+                          disabled={!record.completion.profile}
+                        >
+                          <span>{index + 2}</span>
+                          <div>
+                            <strong>{survey.shortTitle}</strong>
+                            <small>
+                              {record.completion[survey.key]
+                                ? "已提交"
+                                : `${countAnswered(survey, record.sections[survey.key].answers)}/${survey.questions.length}`}
+                            </small>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {studentSurveysCompleted ? (
+                      <p className="completion-note">已完成提交，后台可下载完整数据。</p>
+                    ) : null}
+                  </section>
+                ) : null}
+
                 <section className="stack-card">
                   <p className="eyebrow">档案信息</p>
                   <div className="section-heading">
                       <div>
                         <h2>基础档案</h2>
-                        <p>填写姓名、学校、年级和学科成绩。其余信息可以按实际情况选填。</p>
+                        <p>填写学生信息与成绩。</p>
                       </div>
                     <div className="button-row">
                       {record.completion.profile ? (
@@ -684,69 +742,6 @@ function PublicApp() {
                   </section>
                 ) : null}
 
-                <section className="stack-card">
-                  <p className="eyebrow">测评步骤指导</p>
-                  <h2>按顺序完成就可以</h2>
-                  <ol className="step-list">
-                    <li>填完一项</li>
-                    <li>提交</li>
-                    <li>继续填下一项</li>
-                    <li>四项测评填完，告诉家长：“测评完，我们会第一时间给你出测评报告！”</li>
-                  </ol>
-                </section>
-
-                <section className="stack-card flow-card">
-                  <p className="eyebrow">当前进度</p>
-                  <div className="section-heading">
-                    <div>
-                      <h2>{completedStudentSurveyCount} / {studentSurveyKeys.length} 项已提交</h2>
-                      <p>
-                        {studentSurveysCompleted
-                          ? "四项测评已经完成。"
-                          : nextStudentSurvey
-                            ? `下一项：${nextStudentSurvey.shortTitle}`
-                            : "请继续完成下一项。"}
-                      </p>
-                    </div>
-                    {nextStudentSurvey ? (
-                      <button
-                        type="button"
-                        className="primary"
-                        onClick={() => handleOpenSurvey(nextStudentSurvey.key)}
-                      >
-                        继续填下一项
-                      </button>
-                    ) : null}
-                  </div>
-                  {studentSurveysCompleted ? (
-                    <p className="completion-note">测评完，我们会第一时间给你出测评报告！</p>
-                  ) : null}
-                </section>
-
-                <section className="stack-card">
-                  <div className="section-heading">
-                    <div>
-                      <p className="eyebrow">学习力测评</p>
-                      <h2>4 项测评</h2>
-                    </div>
-                  </div>
-                  <div className="survey-card-grid">
-                    {surveys
-                      .filter((survey) => isStudentSurveyKey(survey.key))
-                      .map((survey) => (
-                        <SurveyCard
-                          key={survey.key}
-                          survey={survey}
-                          completed={record.completion[survey.key]}
-                          answeredCount={countAnswered(
-                            survey,
-                            record.sections[survey.key].answers,
-                          )}
-                          onOpen={() => handleOpenSurvey(survey.key)}
-                        />
-                      ))}
-                  </div>
-                </section>
               </div>
               ) : null}
 
