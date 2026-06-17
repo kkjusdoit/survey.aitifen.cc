@@ -445,7 +445,7 @@ const sendCompletionEmail = async (env: AppEnv, record: PublicRecord, reason: st
 
   return {
     sent: true,
-    message: `已发送完成通知到 ${to}。`,
+    message: "已发送完成通知。",
   };
 };
 

@@ -421,8 +421,8 @@ function PublicApp() {
   const sendCompletionNotice = async (accessCode: string, reason: string) => {
     setNoticeStatus("");
     try {
-      const result = await notifyCompletion(accessCode, reason);
-      setNoticeStatus(result.message);
+      await notifyCompletion(accessCode, reason);
+      setNoticeStatus("已通知老师查看测评结果。");
     } catch (requestError) {
       setNoticeStatus(getMessage(requestError, "通知邮件发送失败，请稍后在后台确认记录。"));
     }
