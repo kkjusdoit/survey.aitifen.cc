@@ -264,7 +264,11 @@ function PublicApp() {
       [questionId]: optionId,
     }));
 
-    if (activeSurvey && questionIndex < activeSurvey.questions.length - 1) {
+    if (!activeSurvey) {
+      return;
+    }
+
+    if (questionIndex < activeSurvey.questions.length - 1) {
       if (transitionTimer.current) {
         window.clearTimeout(transitionTimer.current);
       }
@@ -272,7 +276,10 @@ function PublicApp() {
         setQuestionIndex((current) => current + 1);
         transitionTimer.current = null;
       }, 200);
+      return;
     }
+
+    showFlowHint("最后一题已选择，请点击下方提交完成本项测评。");
   };
 
   useEffect(() => {
