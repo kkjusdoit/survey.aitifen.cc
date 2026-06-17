@@ -506,10 +506,7 @@ function PublicApp() {
         </div>
         {hasStarted ? (
           <div className="access-card">
-            <div className="access-card-head">
-              <span>当前测评</span>
-              <McaInfoButton onClick={() => setShowMcaInfoModal(true)} />
-            </div>
+            <span>当前测评</span>
             <strong>{roleMode === "guardian" ? "独立测评" : "学习力测评"}</strong>
           </div>
         ) : (

@@ -177,13 +177,6 @@ h3 {
     linear-gradient(180deg, rgba(255, 255, 252, 0.92), rgba(239, 248, 244, 0.9));
 }
 
-.access-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .access-card strong {
   font-size: 1.8rem;
   line-height: 1.1;
