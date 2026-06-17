@@ -276,28 +276,142 @@ const studentSurveyKeys: SurveyKey[] = [
 const studentSurveysAreComplete = (record: PublicRecord) =>
   studentSurveyKeys.every((key) => record.completion[key]);
 
-const buildCompletionEmail = (record: PublicRecord, reason: string) => {
+const toUtf8Bom = (textValue: string) => {
+  const body = new TextEncoder().encode(textValue);
+  const result = new Uint8Array(body.length + 3);
+  result.set([0xef, 0xbb, 0xbf], 0);
+  result.set(body, 3);
+  return result;
+};
+
+const bytesToBase64 = (bytes: Uint8Array) => {
+  let binary = "";
+  bytes.forEach((value) => {
+    binary += String.fromCharCode(value);
+  });
+  return btoa(binary);
+};
+
+const htmlEscape = (value: unknown) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+
+const buildStudentCsvAttachments = (record: PublicRecord) => {
+  const studentName = record.profile.studentName || "未填写姓名";
+  const attachments: Array<{ filename: string; content: string }> = [];
+  const addCsv = (filename: string, rows: unknown[][]) => {
+    const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+    attachments.push({
+      filename,
+      content: bytesToBase64(toUtf8Bom(csv)),
+    });
+  };
+
+  addCsv(`${studentName}基础档案.csv`, [
+    [
+      "学生姓名",
+      "学校全称",
+      "年级",
+      "性别",
+      "家长姓名",
+      "家长身份",
+      "语文",
+      "数学",
+      "英语",
+      "物理",
+      "化学",
+      "生物",
+      "政治",
+      "历史",
+      "地理",
+      "成绩备注",
+    ],
+    [
+      record.profile.studentName,
+      record.profile.schoolName,
+      record.profile.grade,
+      record.profile.gender,
+      record.profile.guardianName,
+      record.profile.guardianRole,
+      record.profile.subjectScores.chinese,
+      record.profile.subjectScores.math,
+      record.profile.subjectScores.english,
+      record.profile.subjectScores.physics,
+      record.profile.subjectScores.chemistry,
+      record.profile.subjectScores.biology,
+      record.profile.subjectScores.politics,
+      record.profile.subjectScores.history,
+      record.profile.subjectScores.geography,
+      record.profile.scoreNotes,
+    ],
+  ]);
+
+  const surveysToExport = [
+    { key: "studentMbti" as const, filename: `${studentName}学习性格.csv` },
+    { key: "vark" as const, filename: `${studentName}学习风格.csv` },
+    { key: "learningMotivation" as const, filename: `${studentName}学习动力.csv` },
+    { key: "cognition" as const, filename: `${studentName}学习认知.csv` },
+  ];
+
+  for (const item of surveysToExport) {
+    const survey = SURVEY_CATALOG.surveys.find((candidate) => candidate.key === item.key);
+    if (!survey) {
+      continue;
+    }
+    const section = record.sections[item.key];
+    const rows: unknown[][] = [["题号", "题目内容", "回答内容"]];
+    survey.questions.forEach((question, index) => {
+      const answerId = section.answers[question.id] ?? "";
+      const option = question.options.find((candidate) => candidate.id === answerId);
+      rows.push([index + 1, question.prompt, option?.label ?? ""]);
+    });
+    addCsv(item.filename, rows);
+  }
+
+  return attachments;
+};
+
+const buildCompletionEmail = (record: PublicRecord, reason: string, adminUrl: string) => {
   const profile = record.profile;
+  const studentName = profile.studentName || "未填写姓名";
+  const completedAt = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
   const lines = [
     "MCA学习力测评已有一份学生问卷完成。",
     "",
     `触发类型：${reason}`,
-    `学生姓名：${profile.studentName || "未填写"}`,
+    `学生姓名：${studentName}`,
     `学校：${profile.schoolName || "未填写"}`,
     `年级：${profile.grade || "未填写"}`,
     `访问码：${record.accessCode}`,
-    `完成时间：${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`,
+    `完成时间：${completedAt}`,
     "",
-    "可进入后台查看详情与导出数据。",
+    `可进入后台查看详情与导出数据：${adminUrl}`,
   ];
+  const html = `
+    <p>MCA学习力测评已有一份学生问卷完成。</p>
+    <ul>
+      <li>触发类型：${htmlEscape(reason)}</li>
+      <li>学生姓名：${htmlEscape(studentName)}</li>
+      <li>学校：${htmlEscape(profile.schoolName || "未填写")}</li>
+      <li>年级：${htmlEscape(profile.grade || "未填写")}</li>
+      <li>访问码：${htmlEscape(record.accessCode)}</li>
+      <li>完成时间：${htmlEscape(completedAt)}</li>
+    </ul>
+    <p><a href="${htmlEscape(adminUrl)}">进入后台查看详情与导出数据</a></p>
+  `;
 
   return {
-    subject: `MCA学习力测评完成通知 - ${profile.studentName || record.accessCode}`,
+    subject: `MCA学习力测评完成通知-${studentName}`,
     text: lines.join("\n"),
+    html,
+    attachments: buildStudentCsvAttachments(record),
   };
 };
 
-const sendCompletionEmail = async (env: AppEnv, record: PublicRecord, reason: string) => {
+const sendCompletionEmail = async (env: AppEnv, record: PublicRecord, reason: string, adminUrl: string) => {
   if (!env.RESEND_API_KEY) {
     return {
       sent: false,
@@ -307,7 +421,7 @@ const sendCompletionEmail = async (env: AppEnv, record: PublicRecord, reason: st
 
   const from = env.NOTIFY_FROM_EMAIL || "MCA学习力测评 <notify@aitifen.cc>";
   const to = env.NOTIFY_TO_EMAIL || "97143288@qq.com";
-  const email = buildCompletionEmail(record, reason);
+  const email = buildCompletionEmail(record, reason, adminUrl);
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -319,6 +433,8 @@ const sendCompletionEmail = async (env: AppEnv, record: PublicRecord, reason: st
       to,
       subject: email.subject,
       text: email.text,
+      html: email.html,
+      attachments: email.attachments,
     }),
   });
 
@@ -602,7 +718,9 @@ const handleNotifyCompletion = async (env: AppEnv, accessCode: string, request: 
     return text("Student surveys are not complete", 400);
   }
 
-  const result = await sendCompletionEmail(env, record, reason);
+  const url = new URL(request.url);
+  const adminUrl = `${url.origin}/admin?record=${encodeURIComponent(record.id)}`;
+  const result = await sendCompletionEmail(env, record, reason, adminUrl);
   return json({ ok: true, ...result });
 };
 

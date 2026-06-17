@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GuardianResultReport } from "./components/GuardianResultReport";
 import { SURVEY_CATALOG } from "./questionBank";
 import {
@@ -1050,6 +1050,10 @@ function AdminApp() {
   const [selectedSurveyKey, setSelectedSurveyKey] = useState<SurveyKey | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const deepLinkedRecordId = useMemo(
+    () => new URLSearchParams(window.location.search).get("record"),
+    [],
+  );
 
   const refreshList = async (currentToken: string) => {
     setLoading(true);
@@ -1088,7 +1092,7 @@ function AdminApp() {
     }
   };
 
-  const handleSelect = async (id: string) => {
+  const handleSelect = useCallback(async (id: string) => {
     if (!token) {
       return;
     }
@@ -1103,7 +1107,20 @@ function AdminApp() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || !deepLinkedRecordId || selected?.id === deepLinkedRecordId) {
+      return;
+    }
+    if (!records.some((recordItem) => recordItem.id === deepLinkedRecordId)) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      void handleSelect(deepLinkedRecordId);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [deepLinkedRecordId, handleSelect, records, selected?.id, token]);
 
   const handleExport = async () => {
     if (!token) {
