@@ -61,13 +61,58 @@ const devMode = import.meta.env.DEV;
 type PublicRole = "student" | "guardian";
 
 function App() {
-  const isAdminRoute = window.location.pathname.startsWith("/admin");
-  return isAdminRoute ? <AdminApp /> : <PublicApp />;
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener("popstate", handlePopState);
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function (...args) {
+      originalPushState.apply(this, args);
+      setCurrentPath(window.location.pathname);
+    };
+
+    window.history.replaceState = function (...args) {
+      originalReplaceState.apply(this, args);
+      setCurrentPath(window.location.pathname);
+    };
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, []);
+
+  const navigate = (path: string) => {
+    window.history.pushState(null, "", path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  if (currentPath.startsWith("/admin")) {
+    return <AdminApp navigate={navigate} />;
+  }
+
+  if (currentPath === "/survey") {
+    return <PublicApp navigate={navigate} forceRole="student" />;
+  }
+
+  if (currentPath === "/guardian" || currentPath.startsWith("/guardian/")) {
+    return <PublicApp navigate={navigate} forceRole="guardian" />;
+  }
+
+  return <OfficialSite navigate={navigate} />;
 }
 
-function PublicApp() {
+function PublicApp({ navigate, forceRole }: { navigate: (path: string) => void; forceRole?: PublicRole }) {
   const surveys = SURVEY_CATALOG.surveys;
   const isGuardianUrl =
+    forceRole === "guardian" ||
     window.location.pathname === "/guardian" ||
     window.location.pathname.startsWith("/guardian/") ||
     window.location.search.includes("role=guardian");
@@ -552,6 +597,25 @@ function PublicApp() {
     <div className="page-shell">
       <header className={hasStarted ? "hero-strip compact" : "hero-strip"}>
         <div>
+          <button
+            type="button"
+            className="back-to-home-link"
+            onClick={() => {
+              if (roleMode === "guardian" && activeSurveyKey) {
+                if (window.confirm("确定要放弃当前的家长MBTI答题并返回官网吗？")) {
+                  navigate("/");
+                }
+              } else if (record && activeSurveyKey) {
+                if (window.confirm("测评进度已自动保存，确定要返回官网吗？")) {
+                  navigate("/");
+                }
+              } else {
+                navigate("/");
+              }
+            }}
+          >
+            ← 返回官网
+          </button>
           <p className="eyebrow">AI 提分叶路春</p>
           <div className="hero-title-row">
             <h1>MCA学习力测评</h1>
@@ -719,6 +783,13 @@ function PublicApp() {
                     guardianName={record?.profile.guardianName}
                     onBack={roleMode === "guardian" ? undefined : () => setShowGuardianReport(false)}
                   />
+                  {roleMode === "guardian" && (
+                    <div className="guardian-report-extra-actions" style={{ marginTop: "24px", textAlign: "center" }}>
+                      <button type="button" className="primary" onClick={() => navigate("/")}>
+                        完成测试，返回官网
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : record ? (
               <div className="dashboard-column wide">
@@ -783,7 +854,12 @@ function PublicApp() {
                       })}
                     </div>
                     {studentSurveysCompleted ? (
-                      <p className="completion-note">已完成</p>
+                      <div className="completion-action-box" style={{ marginTop: "16px" }}>
+                        <p className="completion-note" style={{ marginBottom: "8px" }}>已完成</p>
+                        <button type="button" className="primary" onClick={() => navigate("/")}>
+                          返回官网
+                        </button>
+                      </div>
                     ) : null}
                   </section>
                 ) : null}
@@ -1114,7 +1190,7 @@ function SurveyCard({
   );
 }
 
-function AdminApp() {
+function AdminApp({ navigate }: { navigate: (path: string) => void }) {
   const [token, setToken] = useState<string>(() => sessionStorage.getItem(tokenStorageKey) ?? "");
   const [password, setPassword] = useState("");
   const [records, setRecords] = useState<AdminListItem[]>([]);
@@ -1361,6 +1437,9 @@ function AdminApp() {
     <div className="page-shell admin-shell">
       <header className="hero-strip admin">
         <div>
+          <button type="button" className="back-to-home-link" onClick={() => navigate("/")}>
+            ← 返回官网
+          </button>
           <p className="eyebrow">AI 提分叶路春</p>
           <h1>提交后台</h1>
           <p className="hero-copy">查看家长与学生分时提交的数据、进度和导出结果。</p>
@@ -1796,6 +1875,448 @@ function csvEscape(value: unknown): string {
     return `"${str.replaceAll('"', '""')}"`;
   }
   return str;
+}
+
+function OfficialSite({ navigate }: { navigate: (path: string) => void }) {
+  const [activeIcebergPart, setActiveIcebergPart] = useState<"top" | "personality" | "style" | "motivation" | "cognition">("top");
+
+  const icebergData = {
+    top: {
+      title: "冰山一角：学科成绩",
+      desc: "学科成绩只是海面上露出的一角（仅占10%），由海面下的底层要素决定。很多时候单纯刷题只能补冰山之巅，无法改变冰山之底。",
+      tips: "只抓成绩是“治标”，解决底层的学习力才能“治本”。"
+    },
+    personality: {
+      title: "底层要素：学习性格 (MBTI)",
+      desc: "决定孩子是外向还是内向、是凭直觉还是重逻辑。比如：内向逻辑型的孩子适合独自整理，而外向直觉型的孩子通过费曼学习法（教别人）提分最快。",
+      tips: "适配性格，能让学习顺应天性，不再有拧巴和对抗。"
+    },
+    style: {
+      title: "底层要素：学习风格 (VARK)",
+      desc: "孩子对视觉、听觉、阅读和动手操作的敏感度不同。视觉型孩子需要画思维导图，听觉型需要讨论和讲解，操作型需要在场景中练习。",
+      tips: "找到适配的风格，能让记忆和理解效率瞬间提升 2-3 倍。"
+    },
+    motivation: {
+      title: "底层要素：学习动力",
+      desc: "决定了孩子为什么要学习。有的是为了同伴认可（关系驱动），有的是追求自我超越（成就驱动），有的是避免惩罚。识别底层动力，才能精准激发主动性。",
+      tips: "动力不足时，强行塞满周末补习班往往只会招致叛逆。"
+    },
+    cognition: {
+      title: "底层要素：学习认知",
+      desc: "对知识的归纳演绎、对错题的归因方式以及对问题解决路径的掌握。比如西蒙学习法、费曼学习法的应用基础。",
+      tips: "认知升级，是把“努力做题”变成“清晰建构”的必经之路。"
+    }
+  };
+
+  return (
+    <div className="page-shell official-shell">
+      {/* 极简顶栏 */}
+      <nav className="official-nav">
+        <div className="nav-logo">
+          <span className="logo-badge">AI 提分叶路春</span>
+        </div>
+        <div className="nav-actions">
+          <button type="button" className="nav-btn primary" onClick={() => navigate("/survey")}>
+            学生测评
+          </button>
+        </div>
+      </nav>
+
+      {/* Hero 区域 */}
+      <header className="official-hero">
+        <div className="hero-content">
+          <p className="hero-eyebrow">自主学习 × 人工智能 (AI)</p>
+          <h1 className="hero-title">
+            自主学习是学霸的<span>标配</span><br />
+            自主学习 × AI 是学霸的<span>顶配</span>
+          </h1>
+          <p className="hero-subtitle">
+            AI 是加速器，不是方向盘。先学会自主学习，再用 AI 精准提分。
+          </p>
+          <div className="hero-cta-group">
+            <button type="button" className="cta-btn primary-pulse" onClick={() => navigate("/survey")}>
+              <span>开始学生 MCA 测评</span>
+              <small>免费体验 · 包含4大维度</small>
+            </button>
+            <button type="button" className="cta-btn secondary-glow" onClick={() => navigate("/guardian")}>
+              <span>家长 MBTI 测评</span>
+              <small>了解亲子沟通密码</small>
+            </button>
+          </div>
+          <p className="hero-age-hint">适合四年级及以上学生</p>
+        </div>
+        <div className="hero-visual">
+          <div className="visual-card-wrapper">
+            <div className="visual-card formula-card">
+              <span className="card-badge">原创定律</span>
+              <h4>学习第一定律</h4>
+              <div className="formula-display">
+                <span className="formula-main">成绩 = 时间 × 效率 × 精度 × 深度</span>
+              </div>
+              <p>四维决定上限，拒绝无效刷题与低效苦学。</p>
+            </div>
+            <div className="visual-card iceberg-mini">
+              <h4>冰山理论</h4>
+              <p>成绩只是海面上的10%</p>
+              <div className="mini-iceberg-svg">
+                <svg viewBox="0 0 100 80" className="iceberg-svg">
+                  <path d="M 50 10 L 35 45 L 65 45 Z" className="iceberg-tip" />
+                  <line x1="10" y1="45" x2="90" y2="45" className="sea-level" />
+                  <path d="M 35 45 L 20 75 L 80 75 L 65 45 Z" className="iceberg-base" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* 冰山理论交互区 */}
+      <section className="official-section iceberg-section">
+        <div className="section-header">
+          <span className="section-tag">核心方法论一</span>
+          <h2>冰山理论：看清海面下的底层逻辑</h2>
+          <p className="section-desc">
+            学科成绩只是冰山一角，它是由底层的性格、风格、动力与认知共同决定的。
+          </p>
+        </div>
+
+        <div className="iceberg-grid">
+          <div className="iceberg-interactive">
+            <div className="iceberg-container">
+              {/* 海面以上 */}
+              <div 
+                className={`iceberg-part tip ${activeIcebergPart === "top" ? "active" : ""}`}
+                onClick={() => setActiveIcebergPart("top")}
+              >
+                <span className="part-label">海面以上 (10%)</span>
+                <strong>学科成绩</strong>
+              </div>
+              
+              <div className="water-line">
+                <span>海平面</span>
+              </div>
+              
+              {/* 海面以下 */}
+              <div className="iceberg-underwater">
+                <div 
+                  className={`iceberg-part base ${activeIcebergPart === "personality" ? "active" : ""}`}
+                  onClick={() => setActiveIcebergPart("personality")}
+                >
+                  <strong>01 学习性格 (MBTI)</strong>
+                </div>
+                <div 
+                  className={`iceberg-part base ${activeIcebergPart === "style" ? "active" : ""}`}
+                  onClick={() => setActiveIcebergPart("style")}
+                >
+                  <strong>02 学习风格 (VARK)</strong>
+                </div>
+                <div 
+                  className={`iceberg-part base ${activeIcebergPart === "motivation" ? "active" : ""}`}
+                  onClick={() => setActiveIcebergPart("motivation")}
+                >
+                  <strong>03 学习动力</strong>
+                </div>
+                <div 
+                  className={`iceberg-part base ${activeIcebergPart === "cognition" ? "active" : ""}`}
+                  onClick={() => setActiveIcebergPart("cognition")}
+                >
+                  <strong>04 学习认知</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="iceberg-details">
+            <div className="detail-panel">
+              <span className="detail-kicker">已选中板块说明</span>
+              <h3>{icebergData[activeIcebergPart].title}</h3>
+              <p className="detail-body">{icebergData[activeIcebergPart].desc}</p>
+              <div className="detail-tips">
+                <strong>专家洞察：</strong>
+                <span>{icebergData[activeIcebergPart].tips}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 学习第一定律 */}
+      <section className="official-section formula-section">
+        <div className="section-header">
+          <span className="section-tag">核心方法论二</span>
+          <h2>学习第一定律：四维决定成绩上限</h2>
+          <p className="section-desc">
+            真正的提分并非死记硬背，而是有据可依的系统优化。
+          </p>
+        </div>
+
+        <div className="formula-card-large">
+          <div className="formula-math-display">
+            <span className="formula-item keyword">学习成绩</span>
+            <span className="formula-symbol">=</span>
+            <span className="formula-item">学习时间</span>
+            <span className="formula-symbol">×</span>
+            <span className="formula-item">学习效率</span>
+            <span className="formula-symbol">×</span>
+            <span className="formula-item">学习精度</span>
+            <span className="formula-symbol">×</span>
+            <span className="formula-item">学习深度</span>
+          </div>
+          <div className="formula-grid">
+            <div className="formula-factor-item">
+              <div className="factor-num">1</div>
+              <h4>学习时间</h4>
+              <p>不仅是学习时长，更重要的是觉察自身生物钟，找出最高效的学习节奏，进行自我节律管理。</p>
+            </div>
+            <div className="formula-factor-item">
+              <div className="factor-num">2</div>
+              <h4>学习效率</h4>
+              <p>课堂是学习的主战场，把课堂效率拉到极致。课外的一两个小时只是杠杆，用于撬动学校的高效听课能力。</p>
+            </div>
+            <div className="formula-factor-item">
+              <div className="formula-num">3</div>
+              <h4>学习精度</h4>
+              <p>“哪里不会学哪里”，利用思维导图和错题本，对错题进行多维度归因分析，精准扫除知识盲区。</p>
+            </div>
+            <div className="formula-factor-item">
+              <div className="formula-num">4</div>
+              <h4>学习深度</h4>
+              <p>从“被动吸收”升级为“主动演绎”。融合西蒙学习法、费曼学习法，利用 AI 辅助将知识融会贯通。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 学习三大战场 */}
+      <section className="official-section battlefield-section">
+        <div className="section-header">
+          <span className="section-tag">核心方法论三</span>
+          <h2>学习三大战场：用周末补习杠杆学校学习</h2>
+          <p className="section-desc">我们做的是周末补习，但底层目标是推动学校学习 — 让孩子把课堂效率拉到极致。</p>
+        </div>
+        <div className="battlefield-grid">
+          <div className="bf-card bf-school">
+            <div className="bf-icon">🏫</div>
+            <h3>学校学习</h3>
+            <span className="bf-tag">主战场</span>
+            <p>课堂是学习的主阵地，占据孩子最大比例的学习时间。课堂效率是成绩的第一杠杆。</p>
+          </div>
+          <div className="bf-arrow">←</div>
+          <div className="bf-card bf-home">
+            <div className="bf-icon">🏠</div>
+            <h3>家庭学习</h3>
+            <span className="bf-tag">巩固地</span>
+            <p>放学后 1-2 小时的黄金复习时间，是预习、错题消化、进步表反思的关键场景。</p>
+          </div>
+          <div className="bf-arrow">←</div>
+          <div className="bf-card bf-weekend">
+            <div className="bf-icon">🎯</div>
+            <h3>周末补习</h3>
+            <span className="bf-tag">杠杆点</span>
+            <p>我们在这里。但我们不是刷题，而是教会孩子提升课堂效率、掌握自主学习方法，让每一个小时都推动学校的一整周。</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 自主学习六步法 */}
+      <section className="official-section sixstep-section">
+        <div className="section-header">
+          <span className="section-tag">核心方法论四</span>
+          <h2>自主学习六步闭环</h2>
+          <p className="section-desc">课程只是学习的六分之一。真正的学习，发生在完整的六步闭环中。</p>
+        </div>
+        <div className="sixstep-flow">
+          <div className="sixstep-item"><div className="sixstep-num">01</div><h4>预习</h4><p>带着目标进课堂，变被动为主动</p></div>
+          <div className="sixstep-item"><div className="sixstep-num">02</div><h4>听课</h4><p>课堂效率拉满，聚焦核心知识点</p></div>
+          <div className="sixstep-item"><div className="sixstep-num">03</div><h4>做作业</h4><p>独立完成，暴露真实知识漏洞</p></div>
+          <div className="sixstep-item"><div className="sixstep-num">04</div><h4>回顾演绎</h4><p>归纳总结，用费曼法深化理解</p></div>
+          <div className="sixstep-item"><div className="sixstep-num">05</div><h4>考试</h4><p>知识漏洞探测器，不是终点</p></div>
+          <div className="sixstep-item"><div className="sixstep-num">06</div><h4>错题整理</h4><p>归因分析 → AI 强化 → 彻底消灭</p></div>
+        </div>
+        <p className="sixstep-quote">“课程只是六分之一，真正的提分发生在完整的闭环中。”</p>
+      </section>
+
+      {/* 测评 x AI 超级玩法 */}
+      <section className="official-section ai-boost-section">
+        <div className="section-header">
+          <span className="section-tag">核心亮点</span>
+          <h2>测评报告 × AI = 最懂孩子的专属导师</h2>
+          <p className="section-desc">表面花了几十块做测评，投喂给 AI 后，它就变成了最懂你孩子的私人导师。</p>
+        </div>
+        <div className="ai-boost-card">
+          <div className="boost-flow">
+            <div className="boost-step"><div className="boost-icon">📋</div><h4>完成 MCA 测评</h4><p>4 维度多维画像报告</p></div>
+            <div className="boost-arrow">→</div>
+            <div className="boost-step"><div className="boost-icon">🤖</div><h4>投喂给 AI</h4><p>ChatGPT / DeepSeek / 豆包</p></div>
+            <div className="boost-arrow">→</div>
+            <div className="boost-step"><div className="boost-icon">✨</div><h4>精准输出</h4><p>AI 秒变专属导师</p></div>
+          </div>
+          <div className="boost-usecases">
+            <h4>AI 能帮孩子做什么？</h4>
+            <div className="boost-tags">
+              <span>📅 定制个性化学习计划</span>
+              <span>📝 精准讲解错题原因</span>
+              <span>🧠 用孩子听得懂的方式拆解概念</span>
+              <span>🎯 针对薄弱环节出专属练习</span>
+              <span>🔁 艾宾浩斯抗遗忘复习提醒</span>
+              <span>🏀 结合兴趣场景化背单词</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 提分三阶段闭环 */}
+      <section className="official-section loop-section">
+        <div className="section-header">
+          <span className="section-tag">提分服务路径</span>
+          <h2>三阶段闭环：如何利用 AI 精准提分</h2>
+          <p className="section-desc">
+            从测评洞察到 AI 赋能，再到清北学霸伴学，我们将方法论彻底转化为学习习惯。
+          </p>
+        </div>
+
+        <div className="loop-timeline">
+          <div className="timeline-item">
+            <div className="timeline-badge">第一阶段</div>
+            <div className="timeline-card">
+              <h3>测评洞察与适配 (MCA 测评)</h3>
+              <p>通过包含 4 大维度的 MCA 学习力问卷，全方位透视孩子海面下的底层学习特质，形成极高准度的“多维度画像报告”。</p>
+              <div className="timeline-card-sub">
+                <strong>核心价值：</strong>将这份报告投喂给 DeepSeek, ChatGPT 等 AI，让 AI 变成最懂孩子的专属导师，做计划、改错题、讲概念精准度倍增。
+              </div>
+            </div>
+          </div>
+
+          <div className="timeline-item">
+            <div className="timeline-badge">第二阶段</div>
+            <div className="timeline-card">
+              <h3>自主学习与 AI 能力课 (10小时)</h3>
+              <p>6 节系统课。前 3 节打通“自主学习”底座（画思维导图、错题消化、PDCA循环等）；后 3 节培养 AI 提问力、协作力、创造力与判断力。</p>
+              <div className="timeline-card-sub">
+                <strong>独家特色：</strong>全程由“学生投屏”给老师，孩子亲自敲下指令（Prompt），现场实操如何向 AI 精准发问、如何甄别 AI 幻觉。
+              </div>
+            </div>
+          </div>
+
+          <div className="timeline-item">
+            <div className="timeline-badge">第三阶段</div>
+            <div className="timeline-card">
+              <h3>清北学霸伴学与知行合一 (辅导与习惯)</h3>
+              <p>300+ 清华、北京大学学霸个性化伴学。针对数理化、英语重难点精准强补，并采用番茄钟机制，陪伴孩子实操落地所学方法。</p>
+              <div className="timeline-card-sub">
+                <strong>核心目标：</strong>帮助孩子从“知道”走向“做到”。在日常学习中养成画教材思维导图、每日 PDCA 进步表总结、艾宾浩斯抗遗忘等终身习惯。
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 提分案例 */}
+      <section className="official-section cases-section">
+        <div className="section-header">
+          <span className="section-tag">真实成效</span>
+          <h2>精选提分案例</h2>
+          <p className="section-desc">
+            见证通过“自主学习 × AI”方法论实现逆袭的学生故事。
+          </p>
+        </div>
+
+        <div className="cases-grid">
+          <article className="case-card">
+            <div className="case-header">
+              <span className="case-subject math">数学</span>
+              <h3>抗拒学校的初二少年</h3>
+              <div className="case-stat">数学从 <strong>45分</strong> 提到 <strong>120分</strong></div>
+            </div>
+            <p className="case-body">
+              因跟不上学校标准化节奏，该同学产生严重厌学情绪，抗拒去学校。加入后居家自主学习 2-3 个月，利用教材思维导图与 AI 工具锁定弱项错题进行精度补强，最终顺利重拾信心返回学校主战场。
+            </p>
+          </article>
+
+          <article className="case-card">
+            <div className="case-header">
+              <span className="case-subject math">数学</span>
+              <h3>初二同学的思维导图突破</h3>
+              <div className="case-stat">一个月从 <strong>63分</strong> 提升至 <strong>89分</strong></div>
+            </div>
+            <p className="case-body">
+              重点训练其绘制“思维导图”的技能。该同学在十一期间通过手绘和 Xmind 成功将初一至初三的所有数学教材画成了三张宏观思维导图。配合导图，逐一对应分析错题，快速弥补了知识漏洞。
+            </p>
+          </article>
+
+          <article className="case-card">
+            <div className="case-header">
+              <span className="case-subject ai">AI + 伴学</span>
+              <h3>北京初二女生的效率优化</h3>
+              <div className="case-stat">解决 <strong>“低效苦学”</strong> 难题</div>
+            </div>
+            <p className="case-body">
+              在北大元培（AI/计算机方向）学霸的一对一伴学下，这位极其刻苦但效率低下的女生重构了错题整理逻辑。学会通过向 AI 投喂自己的画像来获取最易懂的讲解，彻底实现了“知行合一”的转化。
+            </p>
+          </article>
+
+          <article className="case-card">
+            <div className="case-header">
+              <span className="case-subject english">英语</span>
+              <h3>英语 45 分到稳步提升</h3>
+              <div className="case-stat">150满分仅得 <strong>45分</strong> → 词汇突破</div>
+            </div>
+            <p className="case-body">
+              将英语拆解到最小单元 —— 只抓词汇和阅读。每天背 15-30 个单词，结合 AI 将单词嵌入孩子感兴趣的场景（打篮球、游戏等），让枯燥的记忆变得有趣。英语提分率高达 90-95%。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      {/* 创始人简介 */}
+      <section className="official-section founder-section">
+        <div className="section-header">
+          <span className="section-tag">关于我们</span>
+          <h2>为什么选择 AI提分</h2>
+        </div>
+        <div className="founder-card">
+          <div className="founder-info">
+            <h3>叶路春 · 创始人</h3>
+            <div className="founder-tags">
+              <span>AI 工具研究者（全网千万播放量）</span>
+              <span>前 AI 智习室创始人（100+ 门店）</span>
+            </div>
+            <p className="founder-desc">研究人工智能的过程中，发现 AI 对成年人的提效极其显著，因此切入 AI 赋能教育赛道。长期深耕三大领域：个性化教育（对标 AlphaSchool、可汗学院、北京十一学校）、自主学习方法论、AI 赋能学习。</p>
+            <div className="founder-cross"><strong>跨学科研究底座：</strong>脑科学 · 心理学 · 教育学 · 信息论 · 系统论 · 控制论</div>
+          </div>
+          <div className="founder-stats">
+            <div className="stat-item"><div className="stat-num">100+</div><div className="stat-label">提分案例</div></div>
+            <div className="stat-item"><div className="stat-num">300+</div><div className="stat-label">清北学霸团队</div></div>
+            <div className="stat-item"><div className="stat-num">90%+</div><div className="stat-label">英语提分率</div></div>
+          </div>
+        </div>
+      </section>
+
+      {/* 底部 CTA 引导 */}
+      <section className="official-footer-cta">
+        <h2>测评，是认识自己的开始</h2>
+        <p>没有测评，就没有洞察。花 15-20 分钟做一次全面剖析，或者为自己配置学霸级的提分加速器。</p>
+        <div className="cta-btn-group">
+          <button type="button" className="cta-btn primary" onClick={() => navigate("/survey")}>
+            开始学生 MCA 测评
+          </button>
+          <button type="button" className="cta-btn secondary" onClick={() => navigate("/guardian")}>
+            家长 MBTI 测评
+          </button>
+        </div>
+      </section>
+
+      {/* 底部 */}
+      <footer className="official-footer">
+        <p>© 2026 AI 提分叶路春. All rights reserved.</p>
+        <div className="footer-links">
+          <span className="footer-link" onClick={() => navigate("/survey")}>学生入口</span>
+          <span className="footer-separator">|</span>
+          <span className="footer-link" onClick={() => navigate("/guardian")}>家长入口</span>
+        </div>
+      </footer>
+    </div>
+  );
 }
 
 export default App;

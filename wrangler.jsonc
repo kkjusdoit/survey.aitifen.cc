@@ -4,6 +4,10 @@
   "account_id": "eb2b60a17c13e545fc5e2bd6e15a0efd",
   "main": "server/index.ts",
   "compatibility_date": "2026-06-10",
+  "routes": [
+    { "pattern": "survey.aitifen.cc", "custom_domain": true },
+    { "pattern": "aitifen.cc", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
