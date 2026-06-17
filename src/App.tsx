@@ -2129,7 +2129,7 @@ function OfficialSite({ navigate }: { navigate: (path: string) => void }) {
           <div className="sixstep-item"><div className="sixstep-num">01</div><h4>预习</h4><p>带着目标进课堂，变被动为主动</p></div>
           <div className="sixstep-item"><div className="sixstep-num">02</div><h4>听课</h4><p>课堂效率拉满，聚焦核心知识点</p></div>
           <div className="sixstep-item"><div className="sixstep-num">03</div><h4>做作业</h4><p>独立完成，暴露真实知识漏洞</p></div>
-          <div className="sixstep-item"><div className="sixstep-num">04</div><h4>回顾演绎</h4><p>归纳总结，用费曼法深化理解</p></div>
+          <div className="sixstep-item"><div className="sixstep-num">04</div><h4>归纳演绎</h4><p>归纳总结，用费曼法深化理解</p></div>
           <div className="sixstep-item"><div className="sixstep-num">05</div><h4>考试</h4><p>知识漏洞探测器，不是终点</p></div>
           <div className="sixstep-item"><div className="sixstep-num">06</div><h4>错题整理</h4><p>归因分析 → AI 强化 → 彻底消灭</p></div>
         </div>
@@ -2190,7 +2190,7 @@ function OfficialSite({ navigate }: { navigate: (path: string) => void }) {
           <div className="timeline-item">
             <div className="timeline-badge">第二阶段</div>
             <div className="timeline-card">
-              <h3>自主学习与 AI 能力课 (10小时)</h3>
+              <h3>自主学习与 AI 能力课 (6小时)</h3>
               <p>6 节系统课。前 3 节打通“自主学习”底座（画思维导图、错题消化、PDCA循环等）；后 3 节培养 AI 提问力、协作力、创造力与判断力。</p>
               <div className="timeline-card-sub">
                 <strong>独家特色：</strong>全程由“学生投屏”给老师，孩子亲自敲下指令（Prompt），现场实操如何向 AI 精准发问、如何甄别 AI 幻觉。
