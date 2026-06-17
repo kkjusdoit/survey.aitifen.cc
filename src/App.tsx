@@ -85,6 +85,7 @@ function PublicApp() {
   const [noticeStatus, setNoticeStatus] = useState("");
   const [showGuardianReport, setShowGuardianReport] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showMcaInfoModal, setShowMcaInfoModal] = useState(false);
   const debounceTimer = useRef<number | null>(null);
   const transitionTimer = useRef<number | null>(null);
   const draftHydrated = useRef(isGuardianUrl);
@@ -158,6 +159,21 @@ function PublicApp() {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [hasStarted]);
+
+  useEffect(() => {
+    if (!showMcaInfoModal) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowMcaInfoModal(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showMcaInfoModal]);
 
   useEffect(() => {
     if (!record || !activeSurvey || !draftHydrated.current) {
@@ -480,14 +496,20 @@ function PublicApp() {
       <header className={hasStarted ? "hero-strip compact" : "hero-strip"}>
         <div>
           <p className="eyebrow">AI 提分叶路春</p>
-          <h1>MCA学习力测评</h1>
+          <div className="hero-title-row">
+            <h1>MCA学习力测评</h1>
+            <McaInfoButton onClick={() => setShowMcaInfoModal(true)} />
+          </div>
           {!hasStarted ? (
             <p className="hero-copy">测评，是你认识自己的开始。没有测评，就没有洞察。</p>
           ) : null}
         </div>
         {hasStarted ? (
           <div className="access-card">
-            <span>当前测评</span>
+            <div className="access-card-head">
+              <span>当前测评</span>
+              <McaInfoButton onClick={() => setShowMcaInfoModal(true)} />
+            </div>
             <strong>{roleMode === "guardian" ? "独立测评" : "学习力测评"}</strong>
           </div>
         ) : (
@@ -909,6 +931,9 @@ function PublicApp() {
         </section>
       ) : null}
       <SiteFooter />
+      {showMcaInfoModal ? (
+        <McaInfoModal onClose={() => setShowMcaInfoModal(false)} />
+      ) : null}
       {showCompletionModal ? (
         <div className="modal-overlay" onClick={() => setShowCompletionModal(false)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
@@ -925,6 +950,63 @@ function PublicApp() {
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function McaInfoButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="info-button"
+      onClick={onClick}
+      aria-label="了解 MCA"
+      title="了解 MCA"
+    >
+      ?
+    </button>
+  );
+}
+
+function McaInfoModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="modal-overlay mca-info-overlay" onClick={onClose}>
+      <div
+        className="modal-container mca-info-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mca-info-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="modal-close-button"
+          onClick={onClose}
+          aria-label="关闭 MCA 说明"
+          title="关闭"
+        >
+          ×
+        </button>
+        <div className="modal-icon info">?</div>
+        <h2 id="mca-info-title" className="modal-title">为什么要做 MCA 学习力测评？</h2>
+        <div className="mca-info-content">
+          <section>
+            <h3>MCA 是什么</h3>
+            <p>MCA 是一套从性格倾向、学习动力、学习风格、认知方式四个角度理解学生学习状态的测评。它不是给孩子贴标签，而是帮助老师和家长看见孩子真实的学习模式。</p>
+          </section>
+          <section>
+            <h3>它解决什么问题</h3>
+            <p>很多学习问题表面看是成绩，背后可能是动力不足、接收信息方式不匹配、表达和决策习惯不同。MCA 先给出一张学习画像，让后续沟通少一点猜测，多一点依据。</p>
+          </section>
+          <section>
+            <h3>测完有什么用</h3>
+            <p>老师可以基于结果做更具体的沟通和提分建议；家长也能更容易理解孩子适合怎样被引导。测评不是结论，是一次更准确的开始。</p>
+          </section>
+        </div>
+        <button type="button" className="primary modal-btn" onClick={onClose}>
+          知道了
+        </button>
+      </div>
     </div>
   );
 }
