@@ -1093,13 +1093,42 @@ tbody tr:hover {
 
   .mca-info-overlay {
     align-items: end;
-    padding: 14px;
+    padding: 14px 14px max(14px, env(safe-area-inset-bottom));
+    min-height: 100svh;
   }
 
   .mca-info-modal {
-    max-height: calc(100vh - 28px);
+    width: 100%;
+    max-height: calc(100svh - 28px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 28px - env(safe-area-inset-bottom));
+    overflow: hidden;
+    padding: 30px 20px max(18px, env(safe-area-inset-bottom));
+    gap: 14px;
+  }
+
+  .mca-info-modal .modal-title {
+    font-size: 1.42rem;
+  }
+
+  .mca-info-content {
     overflow-y: auto;
-    padding: 30px 20px 22px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 2px;
+    min-height: 0;
+  }
+
+  .mca-info-content section {
+    padding: 12px;
+  }
+
+  .mca-info-content p {
+    font-size: 0.92rem;
+    line-height: 1.58;
+  }
+
+  .mca-info-modal .modal-btn {
+    flex: 0 0 auto;
   }
 }
 
