@@ -53,6 +53,10 @@ button {
   cursor: pointer;
 }
 
+button[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 .page-shell {
   position: relative;
   min-height: 100vh;
@@ -410,6 +414,38 @@ button.flow-step:not(:disabled):hover {
 button.flow-step:disabled {
   cursor: not-allowed;
   opacity: 0.72;
+}
+
+.flow-step.locked {
+  border-color: rgba(25, 49, 43, 0.08);
+  background: rgba(245, 248, 246, 0.62);
+  color: rgba(23, 32, 29, 0.52);
+}
+
+.flow-step.locked span {
+  background: rgba(25, 49, 43, 0.07);
+  color: rgba(47, 117, 111, 0.62);
+}
+
+.flow-step.locked small {
+  color: rgba(96, 113, 108, 0.82);
+}
+
+button.flow-step.locked:hover {
+  border-color: rgba(25, 49, 43, 0.12);
+  transform: none;
+}
+
+.action-locked {
+  border-color: rgba(25, 49, 43, 0.12);
+  background: rgba(96, 113, 108, 0.2);
+  color: rgba(23, 32, 29, 0.58);
+  box-shadow: none;
+}
+
+.action-locked:hover {
+  background: rgba(96, 113, 108, 0.24);
+  transform: none;
 }
 
 .stack-card {

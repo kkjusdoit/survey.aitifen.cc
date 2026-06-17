@@ -83,11 +83,13 @@ function PublicApp() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [noticeStatus, setNoticeStatus] = useState("");
+  const [flowHint, setFlowHint] = useState("");
   const [showGuardianReport, setShowGuardianReport] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showMcaInfoModal, setShowMcaInfoModal] = useState(false);
   const debounceTimer = useRef<number | null>(null);
   const transitionTimer = useRef<number | null>(null);
+  const flowHintTimer = useRef<number | null>(null);
   const draftHydrated = useRef(isGuardianUrl);
   const allowBrowserBack = useRef(false);
 
@@ -281,12 +283,57 @@ function PublicApp() {
     };
   }, [activeSurveyKey, questionIndex]);
 
+  useEffect(() => {
+    return () => {
+      if (flowHintTimer.current) {
+        window.clearTimeout(flowHintTimer.current);
+      }
+    };
+  }, []);
+
+  const showFlowHint = (message: string) => {
+    setFlowHint(message);
+    if (flowHintTimer.current) {
+      window.clearTimeout(flowHintTimer.current);
+    }
+    flowHintTimer.current = window.setTimeout(() => {
+      setFlowHint("");
+      flowHintTimer.current = null;
+    }, 2800);
+  };
+
+  const getSurveyLockMessage = (surveyKey: SurveyKey) => {
+    if (!record || !isStudentSurveyKey(surveyKey) || record.completion[surveyKey]) {
+      return "";
+    }
+    if (!record.completion.profile) {
+      return "请先保存基础档案，再开始测评。";
+    }
+
+    const surveyIndex = studentSurveyKeys.indexOf(surveyKey);
+    const previousSurveyKey = studentSurveyKeys
+      .slice(0, surveyIndex)
+      .find((key) => !record.completion[key]);
+    if (!previousSurveyKey) {
+      return "";
+    }
+
+    const previousSurvey = surveys.find((item) => item.key === previousSurveyKey);
+    const currentSurvey = surveys.find((item) => item.key === surveyKey);
+    return `请先完成${previousSurvey?.shortTitle ?? "上一项测评"}，再进入${currentSurvey?.shortTitle ?? "下一项测评"}。`;
+  };
+
   const handleOpenSurvey = (surveyKey: SurveyKey) => {
     if (!record) {
       return;
     }
     const survey = surveys.find((item) => item.key === surveyKey);
     if (!survey) {
+      return;
+    }
+    const lockMessage = getSurveyLockMessage(surveyKey);
+    if (lockMessage) {
+      showFlowHint(lockMessage);
       return;
     }
     const section = record.sections[surveyKey];
@@ -397,6 +444,9 @@ function PublicApp() {
     : null;
   const studentSurveysCompleted = completedStudentSurveyCount === studentSurveyKeys.length;
   const studentFlowSurveys = surveys.filter((survey) => isStudentSurveyKey(survey.key));
+  const nextStudentSurveyLockMessage = nextStudentSurvey
+    ? getSurveyLockMessage(nextStudentSurvey.key)
+    : "";
 
   const fillProfileSample = () => {
     setProfileDraft({
@@ -520,6 +570,7 @@ function PublicApp() {
 
       {error ? <div className="toast error">{error}</div> : null}
       {lastSavedAt ? <div className="toast success">最近保存：{lastSavedAt}</div> : null}
+      {flowHint ? <div className="toast info">{flowHint}</div> : null}
       {noticeStatus ? <div className="toast info">{noticeStatus}</div> : null}
 
       {!hasStarted ? (
@@ -674,9 +725,10 @@ function PublicApp() {
                       {nextStudentSurvey ? (
                         <button
                           type="button"
-                          className="primary"
+                          className={nextStudentSurveyLockMessage ? "primary action-locked" : "primary"}
                           onClick={() => handleOpenSurvey(nextStudentSurvey.key)}
-                          disabled={!record.completion.profile}
+                          aria-disabled={Boolean(nextStudentSurveyLockMessage)}
+                          title={nextStudentSurveyLockMessage || undefined}
                         >
                           继续：{nextStudentSurvey.shortTitle}
                         </button>
@@ -690,25 +742,38 @@ function PublicApp() {
                           <small>{record.completion.profile ? "已保存" : "待保存"}</small>
                         </div>
                       </div>
-                      {studentFlowSurveys.map((survey, index) => (
-                        <button
-                          key={survey.key}
-                          type="button"
-                          className={record.completion[survey.key] ? "flow-step done" : "flow-step"}
-                          onClick={() => handleOpenSurvey(survey.key)}
-                          disabled={!record.completion.profile}
-                        >
-                          <span>{index + 2}</span>
-                          <div>
-                            <strong>{survey.shortTitle}</strong>
-                            <small>
-                              {record.completion[survey.key]
-                                ? "已提交"
-                                : `${countAnswered(survey, record.sections[survey.key].answers)}/${survey.questions.length}`}
-                            </small>
-                          </div>
-                        </button>
-                      ))}
+                      {studentFlowSurveys.map((survey, index) => {
+                        const lockMessage = getSurveyLockMessage(survey.key);
+                        const answeredCount = countAnswered(survey, record.sections[survey.key].answers);
+                        return (
+                          <button
+                            key={survey.key}
+                            type="button"
+                            className={[
+                              "flow-step",
+                              record.completion[survey.key] ? "done" : "",
+                              lockMessage ? "locked" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            onClick={() => handleOpenSurvey(survey.key)}
+                            aria-disabled={Boolean(lockMessage)}
+                            title={lockMessage || undefined}
+                          >
+                            <span>{index + 2}</span>
+                            <div>
+                              <strong>{survey.shortTitle}</strong>
+                              <small>
+                                {record.completion[survey.key]
+                                  ? "已提交"
+                                  : lockMessage
+                                    ? "待前一步完成"
+                                    : `${answeredCount}/${survey.questions.length}`}
+                              </small>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                     {studentSurveysCompleted ? (
                       <p className="completion-note">已完成</p>
