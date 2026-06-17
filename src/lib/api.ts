@@ -78,6 +78,17 @@ export function saveSurveySection(
   );
 }
 
+export function notifyCompletion(accessCode: string, reason = "completed") {
+  return apiRequest<{ ok: true; sent: boolean; message: string }>(
+    `/api/public/records/${encodeURIComponent(accessCode)}/notify-completion`,
+    {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ reason }),
+    },
+  );
+}
+
 export function adminLogin(password: string) {
   return apiRequest<{ token: string }>("/api/admin/login", {
     method: "POST",

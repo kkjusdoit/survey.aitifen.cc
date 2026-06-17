@@ -16,6 +16,8 @@
     }
   ],
   "vars": {
-    "OWNER_LABEL": "AI 提分叶路春"
+    "OWNER_LABEL": "AI 提分叶路春",
+    "NOTIFY_TO_EMAIL": "97143288@qq.com",
+    "NOTIFY_FROM_EMAIL": "MCA学习力测评 <notify@aitifen.cc>"
   }
 }

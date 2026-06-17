@@ -10,6 +10,7 @@ import {
   getAdminRecord,
   getPublicRecord,
   listAdminRecords,
+  notifyCompletion,
   saveProfile,
   saveSurveySection,
 } from "./lib/api";
@@ -81,11 +82,13 @@ function PublicApp() {
   const [surveyDraft, setSurveyDraft] = useState<AnswerMap>({});
   const [questionIndex, setQuestionIndex] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState("");
+  const [noticeStatus, setNoticeStatus] = useState("");
   const [showGuardianReport, setShowGuardianReport] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const debounceTimer = useRef<number | null>(null);
   const transitionTimer = useRef<number | null>(null);
   const draftHydrated = useRef(isGuardianUrl);
+  const allowBrowserBack = useRef(false);
 
   const activeSurvey = useMemo(
     () => surveys.find((survey) => survey.key === activeSurveyKey) ?? null,
@@ -121,6 +124,40 @@ function PublicApp() {
       cancelled = true;
     };
   }, [isGuardianUrl, record]);
+
+  const hasStarted = Boolean(record) || roleMode === "guardian";
+
+  useEffect(() => {
+    if (!hasStarted) {
+      return;
+    }
+
+    window.history.pushState({ mcaSurveyGuard: true }, "", window.location.href);
+
+    const handlePopState = () => {
+      if (allowBrowserBack.current) {
+        return;
+      }
+      if (window.confirm("测评进度已自动保存，确定要离开当前测评吗？")) {
+        allowBrowserBack.current = true;
+        window.history.back();
+        return;
+      }
+      window.history.pushState({ mcaSurveyGuard: true }, "", window.location.href);
+    };
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasStarted]);
 
   useEffect(() => {
     if (!record || !activeSurvey || !draftHydrated.current) {
@@ -301,12 +338,23 @@ function PublicApp() {
       setLastSavedAt(formatTime(response.record.updatedAt));
 
       if (!wasCompleted && isCompletedNow && roleMode === "student") {
+        await sendCompletionNotice(response.record.accessCode, "completed");
         setShowCompletionModal(true);
       }
     } catch (requestError) {
       setError(getMessage(requestError, "提交测评失败"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendCompletionNotice = async (accessCode: string, reason: string) => {
+    setNoticeStatus("");
+    try {
+      const result = await notifyCompletion(accessCode, reason);
+      setNoticeStatus(result.message);
+    } catch (requestError) {
+      setNoticeStatus(getMessage(requestError, "通知邮件发送失败，请稍后在后台确认记录。"));
     }
   };
 
@@ -321,7 +369,6 @@ function PublicApp() {
           roleMode === "guardian" && !record ? surveyDraft : record?.sections.guardianMbti.answers ?? {},
         )
       : null;
-  const hasStarted = Boolean(record) || roleMode === "guardian";
   const completedStudentSurveyCount = record
     ? studentSurveyKeys.filter((key) => record.completion[key]).length
     : 0;
@@ -420,6 +467,14 @@ function PublicApp() {
     }
   };
 
+  const fillAllSurveysAndNotifyForDev = async () => {
+    if (!record || !devMode) {
+      return;
+    }
+    await fillAllSurveysForDev();
+    await sendCompletionNotice(record.accessCode, "dev-test");
+  };
+
   return (
     <div className="page-shell">
       <header className={hasStarted ? "hero-strip compact" : "hero-strip"}>
@@ -427,7 +482,7 @@ function PublicApp() {
           <p className="eyebrow">AI 提分叶路春</p>
           <h1>MCA学习力测评</h1>
           {!hasStarted ? (
-            <p className="hero-copy">测评，是你认识自己的开始。先完成一份清晰、安静的学习力画像，再把后续沟通交给老师。</p>
+            <p className="hero-copy">测评，是你认识自己的开始。没有测评，就没有洞察。</p>
           ) : null}
         </div>
         {hasStarted ? (
@@ -446,6 +501,7 @@ function PublicApp() {
 
       {error ? <div className="toast error">{error}</div> : null}
       {lastSavedAt ? <div className="toast success">最近保存：{lastSavedAt}</div> : null}
+      {noticeStatus ? <div className="toast info">{noticeStatus}</div> : null}
 
       {!hasStarted ? (
         <section className="board board-home">
@@ -796,11 +852,16 @@ function PublicApp() {
                     <div className="section-heading">
                       <div>
                         <h2>测试加速</h2>
-                        <p>快速造一条完整样例记录，直接验证后台、导出和完成态。</p>
+                        <p>快速造一条完整样例记录，直接验证后台、导出、完成态和邮件通知。</p>
                       </div>
-                      <button type="button" className="ghost" onClick={fillAllSurveysForDev} disabled={loading}>
-                        一键填完整套
-                      </button>
+                      <div className="button-row">
+                        <button type="button" className="ghost" onClick={fillAllSurveysForDev} disabled={loading}>
+                          一键填完整套
+                        </button>
+                        <button type="button" className="secondary" onClick={fillAllSurveysAndNotifyForDev} disabled={loading}>
+                          跳过问卷并发送测试通知
+                        </button>
+                      </div>
                     </div>
                   </section>
                 ) : null}
@@ -1431,10 +1492,12 @@ function subjectLabel(key: string) {
 }
 
 class SimpleZip {
-  private files: { name: string; content: Uint8Array }[] = [];
+  private files: { name: string; content: Uint8Array<ArrayBuffer> }[] = [];
 
   addFile(name: string, content: Uint8Array) {
-    this.files.push({ name, content });
+    const normalized = new Uint8Array(content.length);
+    normalized.set(content);
+    this.files.push({ name, content: normalized });
   }
 
   private makeCrcTable(): number[] {
@@ -1463,7 +1526,7 @@ class SimpleZip {
   }
 
   generate(): Blob {
-    const buffers: any[] = [];
+    const buffers: BlobPart[] = [];
     const localHeaders: { offset: number; size: number; crc: number; name: string }[] = [];
     let currentOffset = 0;
 

@@ -11,6 +11,9 @@ import type {
 interface AppEnv extends Env {
   ADMIN_PASSWORD: string;
   SESSION_SECRET: string;
+  RESEND_API_KEY?: string;
+  NOTIFY_FROM_EMAIL?: string;
+  NOTIFY_TO_EMAIL?: string;
 }
 
 type RecordRow = {
@@ -262,6 +265,73 @@ const buildSingleRecordExport = (record: PublicRecord) => ({
     };
   }),
 });
+
+const studentSurveyKeys: SurveyKey[] = [
+  "studentMbti",
+  "learningMotivation",
+  "vark",
+  "cognition",
+];
+
+const studentSurveysAreComplete = (record: PublicRecord) =>
+  studentSurveyKeys.every((key) => record.completion[key]);
+
+const buildCompletionEmail = (record: PublicRecord, reason: string) => {
+  const profile = record.profile;
+  const lines = [
+    "MCA学习力测评已有一份学生问卷完成。",
+    "",
+    `触发类型：${reason}`,
+    `学生姓名：${profile.studentName || "未填写"}`,
+    `学校：${profile.schoolName || "未填写"}`,
+    `年级：${profile.grade || "未填写"}`,
+    `访问码：${record.accessCode}`,
+    `完成时间：${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`,
+    "",
+    "可进入后台查看详情与导出数据。",
+  ];
+
+  return {
+    subject: `MCA学习力测评完成通知 - ${profile.studentName || record.accessCode}`,
+    text: lines.join("\n"),
+  };
+};
+
+const sendCompletionEmail = async (env: AppEnv, record: PublicRecord, reason: string) => {
+  if (!env.RESEND_API_KEY) {
+    return {
+      sent: false,
+      message: "通知记录已生成，但邮件服务未配置 RESEND_API_KEY。",
+    };
+  }
+
+  const from = env.NOTIFY_FROM_EMAIL || "MCA学习力测评 <notify@aitifen.cc>";
+  const to = env.NOTIFY_TO_EMAIL || "97143288@qq.com";
+  const email = buildCompletionEmail(record, reason);
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to,
+      subject: email.subject,
+      text: email.text,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(body || `Resend request failed: ${response.status}`);
+  }
+
+  return {
+    sent: true,
+    message: `已发送完成通知到 ${to}。`,
+  };
+};
 
 const makeAccessCode = () => {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -519,6 +589,23 @@ const handleSaveSurvey = async (
   });
 };
 
+const handleNotifyCompletion = async (env: AppEnv, accessCode: string, request: Request) => {
+  const existing = await getRecordByAccessCode(env.DB, accessCode);
+  if (!existing) {
+    return text("Record not found", 404);
+  }
+
+  const body = await parseJson<{ reason?: string }>(request);
+  const record = rowToRecord(existing);
+  const reason = body.reason || "completed";
+  if (reason !== "dev-test" && !studentSurveysAreComplete(record)) {
+    return text("Student surveys are not complete", 400);
+  }
+
+  const result = await sendCompletionEmail(env, record, reason);
+  return json({ ok: true, ...result });
+};
+
 const serveSpaAsset = async (request: Request, env: AppEnv) => {
   const url = new URL(request.url);
   if (url.pathname === "/" || !url.pathname.includes(".")) {
@@ -679,6 +766,11 @@ export default {
       const profileMatch = pathname.match(/^\/api\/public\/records\/([^/]+)\/profile$/);
       if (request.method === "POST" && profileMatch) {
         return await handleSaveProfile(env, decodeURIComponent(profileMatch[1]), request);
+      }
+
+      const notifyMatch = pathname.match(/^\/api\/public\/records\/([^/]+)\/notify-completion$/);
+      if (request.method === "POST" && notifyMatch) {
+        return await handleNotifyCompletion(env, decodeURIComponent(notifyMatch[1]), request);
       }
 
       const surveyMatch = pathname.match(
