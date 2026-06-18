@@ -90,15 +90,21 @@ function App() {
   }, []);
 
   const navigate = (path: string) => {
+    if (path === "/" && window.location.hostname.startsWith("survey.")) {
+      window.location.href = "https://aitifen.cc/";
+      return;
+    }
     window.history.pushState(null, "", path);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const isSurveyDomain = window.location.hostname.startsWith("survey.");
 
   if (currentPath.startsWith("/admin")) {
     return <AdminApp navigate={navigate} />;
   }
 
-  if (currentPath === "/survey") {
+  if (currentPath === "/survey" || (currentPath === "/" && isSurveyDomain)) {
     return <PublicApp navigate={navigate} forceRole="student" />;
   }
 
