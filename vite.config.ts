@@ -3,6 +3,10 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    target: "ios14",
+    cssTarget: "ios14",
+  },
   server: {
     proxy: {
       "/api": {
