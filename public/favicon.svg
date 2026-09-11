@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#grad)" />
+  <!-- Graduation cap / AI symbol -->
+  <path d="M50 24 L78 38 L50 52 L22 38 Z" fill="#ffffff" />
+  <path d="M30 44 L30 62 C30 62 40 72 50 72 C60 72 70 62 70 62 L70 44 L50 54 Z" fill="#ffffff" opacity="0.9" />
+  <circle cx="78" cy="48" r="4" fill="#fbbf24" />
+  <path d="M78 52 L78 68" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" />
+</svg>
