@@ -739,6 +739,10 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
+    if (pathname === "/baidu_verify_codeva-vw3OiUMPPN.html") {
+      return text("331df3e43465eb26073fa82f4a17db0c", 200, { "Content-Type": "text/html; charset=utf-8" });
+    }
+
     try {
       if (request.method === "POST" && pathname === "/api/admin/login") {
         const body = await parseJson<{ password: string }>(request);
