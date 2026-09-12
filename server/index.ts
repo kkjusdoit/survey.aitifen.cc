@@ -737,6 +737,9 @@ const serveSpaAsset = async (request: Request, env: AppEnv) => {
 export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.hostname === "www.aitifen.cc") {
+      return Response.redirect(`https://aitifen.cc${url.pathname}${url.search}`, 301);
+    }
     const pathname = url.pathname;
 
     if (pathname === "/baidu_verify_codeva-vw3OiUMPPN.html") {

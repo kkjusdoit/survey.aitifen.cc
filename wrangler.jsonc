@@ -6,7 +6,8 @@
   "compatibility_date": "2026-06-10",
   "routes": [
     { "pattern": "survey.aitifen.cc", "custom_domain": true },
-    { "pattern": "aitifen.cc", "custom_domain": true }
+    { "pattern": "aitifen.cc", "custom_domain": true },
+    { "pattern": "www.aitifen.cc", "custom_domain": true }
   ],
   "assets": {
     "directory": "./dist",
