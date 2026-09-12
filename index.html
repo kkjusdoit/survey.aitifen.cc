@@ -10,6 +10,7 @@
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://aitifen.cc/" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM Context" />
 
     <!-- Open Graph / 社交卡片 -->
     <meta property="og:type" content="website" />
@@ -18,25 +19,70 @@
     <meta property="og:description" content="自主学习是学霸标配，自主学习×AI是学霸顶配。专属AI导师多维诊断底层学习力，实现靶向精准提分。" />
     <meta property="og:url" content="https://aitifen.cc/" />
 
-    <!-- Google 结构化数据 (JSON-LD) -->
+    <!-- Google 结构化数据 (JSON-LD Graph: WebApplication + FAQPage + Person) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "AI 提分叶路春｜个性化教育测评",
-      "url": "https://aitifen.cc/",
-      "applicationCategory": "EducationalApplication",
-      "operatingSystem": "All",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "CNY"
-      },
-      "description": "融合自主学习与前沿AI教育测评技术，提供学生MBTI性格测评、学习动机测评、VARK学习风格诊断、元认知与家庭教育风格诊断及个性化提分方案。",
-      "provider": {
-        "@type": "Person",
-        "name": "叶路春"
-      }
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "@id": "https://aitifen.cc/#webapp",
+          "name": "AI 提分叶路春｜个性化教育测评",
+          "url": "https://aitifen.cc/",
+          "applicationCategory": "EducationalApplication",
+          "operatingSystem": "All",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "CNY"
+          },
+          "description": "融合自主学习与前沿AI教育测评技术，提供学生MBTI性格测评、学习动机测评、VARK学习风格诊断、元认知与家庭教育风格诊断及个性化提分方案。",
+          "provider": {
+            "@type": "Person",
+            "@id": "https://aitifen.cc/#person",
+            "name": "叶路春",
+            "jobTitle": "教育专家 / AI提分体系创始人"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://aitifen.cc/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "什么是 MCA 学习力测评？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "MCA 测评是由叶路春老师基于教育认知心理学研发的多维综合学情诊断系统，涵盖学生 MBTI 性格、学习内在驱动力、VARK 感官认知通道、元认知策略以及家长协同教育风格五大维度。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "AI 提分测评适合哪些学生群体？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "本测评适用于小学高年级、初中（初一至初三）以及高中（高一至高三）学生，尤其适合面临中考或高考冲刺、苦于盲目刷题却提分困难的自主学习者。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "测评报告能提供哪些具体帮助？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "测评完成后即时生成多维诊断报告，精准指出学生的认知短板与学科薄弱点，并给出专属的学习通道适配方案、自驱力激发路径与提分行动清单。"
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "如何结合 AI 实现自主学习高效提分？",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "通过自主学习六步闭环（目标明确、诊断定位、制定路径、深度学习、靶向训练、复盘迭代），让专属 AI 导师辅助诊断解题逻辑，告别被动填鸭式学习。"
+              }
+            }
+          ]
+        }
+      ]
     }
     </script>
 
